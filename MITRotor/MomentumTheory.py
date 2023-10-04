@@ -3,6 +3,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Union, Tuple
 
 import numpy as np
+import numpy.typing as npt
 from .Utilities import fixedpointiteration
 
 
@@ -13,10 +14,10 @@ class MomentumSolution:
     Ctprime: float
     yaw: float
     # beta: float
-    an: Union[float, np.array]
-    u4: Union[float, np.array]
-    v4: Union[float, np.array]
-    dp: Union[float, np.array]
+    an: Union[float, npt.ArrayLike]
+    u4: Union[float, npt.ArrayLike]
+    v4: Union[float, npt.ArrayLike]
+    dp: Union[float, npt.ArrayLike]
     niter: int
     converged: bool
 
@@ -48,24 +49,26 @@ class MomentumSolution:
 
 class MomentumBase(metaclass=ABCMeta):
     @abstractmethod
-    def solve(self, Ctprime, yaw, **kwargs) -> MomentumSolution:
+    def solve(self, Ctprime: float, yaw: float, **kwargs) -> MomentumSolution:
         ...
 
 
 class LimitedHeck(MomentumBase):
-    def solve(self, Ctprime: float, yaw: float) -> Tuple[float, float, float, float]:
-        """
-        Solves the limiting case when v_4 << u_4. (Eq. 2.19, 2.20). Also takes Numpy
-        array arguments.
+    """
+    Solves the limiting case when v_4 << u_4. (Eq. 2.19, 2.20). Also takes Numpy
+    array arguments.
+    """
 
+    def solve(self, Ctprime: float, yaw: float) -> MomentumSolution:
+        """
         Args:
             Ctprime (float): Rotor thrust coefficient.
             yaw (float): Rotor yaw angle (radians).
-            Uamb (float): Ambient wind velocity. Defaults to 1.0.
 
         Returns:
             Tuple[float, float, float]: induction and outlet velocities.
         """
+
         a = Ctprime * np.cos(yaw) ** 2 / (4 + Ctprime * np.cos(yaw) ** 2)
         u4 = (4 - Ctprime * np.cos(yaw) ** 2) / (4 + Ctprime * np.cos(yaw) ** 2)
         v4 = (
@@ -77,6 +80,10 @@ class LimitedHeck(MomentumBase):
 
 
 class Heck(MomentumBase):
+    """
+    Solves the iterative momentum equation for an actuator disk model.
+    """
+
     def initial_condition(self, Ctprime, yaw):
         sol = LimitedHeck().solve(Ctprime, yaw)
         return sol.an, sol.u4, sol.v4
@@ -84,14 +91,25 @@ class Heck(MomentumBase):
     def solve(
         self, Ctprime: float, yaw: float, x0=None, eps=0.00001
     ) -> MomentumSolution:
+        """
+        Args:
+            Ctprime (float): Rotor thrust coefficient.
+            yaw (float): Rotor yaw angle (radians).
+
+        Returns:
+            Tuple[float, float, float]: induction and outlet velocities.
+        """
         if x0 is None:
             x0 = self.initial_condition(Ctprime, yaw)
+
+        relax = 0.9 if np.max(Ctprime) > 15 else 0.1
 
         sol = fixedpointiteration(
             self.residual,
             x0,
             args=(Ctprime, yaw),
             eps=eps,
+            relax=relax,
         )
 
         if sol.converged:
@@ -139,7 +157,7 @@ class UnifiedMomentum(MomentumBase):
 
         return np.vstack([an, u4, v4, dp])
 
-    def residual(self, x: np.ndarray, Ctprime: float, yaw: float) -> np.ndarray:
+    def residual(self, x: np.ndarray, Ctprime: float, yaw: float) -> Tuple[float, ...]:
         """Returns the residual equations for the fixed point iteration."""
         an, u4, v4, dp = x
 
@@ -207,7 +225,7 @@ class UnifiedMomentum(MomentumBase):
         return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged)
 
 
-class ThrustBasedUnified(MomentumBase):
+class ThrustBasedUnified(UnifiedMomentum):
     def __init__(self, beta=0.1403):
         self.beta = beta
 
@@ -256,6 +274,4 @@ class ThrustBasedUnified(MomentumBase):
         else:
             a, u4, v4, dp, Ctprime = np.nan * np.zeros_like(x0)
 
-        return MomentumSolution(
-            Ctprime, yaw, self.beta, a, u4, v4, dp, sol.niter, sol.converged
-        )
+        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged)

@@ -1,5 +1,6 @@
-from typing import Callable
+from typing import Callable, Any
 import numpy as np
+import numpy.typing as npt
 from multiprocessing import Pool
 from tqdm import tqdm
 
@@ -14,14 +15,14 @@ class FixedPointIterationResult:
 
 
 def fixedpointiteration(
-    f: Callable[[np.ndarray, any], np.ndarray],
+    f: Callable[[npt.ArrayLike, Any], np.ndarray],
     x0: np.ndarray,
     args=(),
     kwargs={},
     eps=0.00001,
     maxiter=100,
     relax=0,
-) -> np.ndarray:
+) -> FixedPointIterationResult:
     """
     Performs fixed-point iteration on function f until residuals converge or max
     iterations is reached.
@@ -75,7 +76,7 @@ def for_each(func, params, parallel=True):
 
 
 def adaptivefixedpointiteration(
-    f: Callable[[np.ndarray, any], np.ndarray],
+    f: Callable[[np.ndarray, Any], np.ndarray],
     x0: np.ndarray,
     args=(),
     kwargs={},
