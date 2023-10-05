@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 from MITRotor.BEM import BEM
 from MITRotor.ReferenceTurbines import IEA15MW
 
+# Use Latex Fonts
+plt.rcParams.update({"text.usetex": True, "font.family": "serif"})
+
 rotor = IEA15MW()
 
 
