@@ -12,6 +12,8 @@ from MITRotor.Utilities import for_each
 
 rotor = IEA15MW()
 
+# Use Latex Fonts
+plt.rcParams.update({"text.usetex": True, "font.family": "serif"})
 
 FIGDIR = Path("fig")
 FIGDIR.mkdir(exist_ok=True, parents=True)
@@ -124,14 +126,14 @@ if __name__ == "__main__":
     # }
     marker_properties = {
         "optimal_unified": dict(
-            label="Optimal (unified momentum)",
+            label="Optimal\n(Unified momentum)",
             marker="*",
             ms=5,
             c="k",
             ls="",
         ),
         "optimal_madsen": dict(
-            label="Optimal (Madsen (2020))",
+            label="Optimal\n(Madsen (2020))",
             marker="*",
             ms=5,
             c="tab:orange",
@@ -139,9 +141,9 @@ if __name__ == "__main__":
         ),
         "high_thrust": dict(
             label="High-thrust sample",
-            marker="+",
-            ms=5,
-            c="r",
+            marker="X",
+            ms=7,
+            c="magenta",
             ls="",
         ),
     }
@@ -151,8 +153,7 @@ if __name__ == "__main__":
     df = df.with_columns(
         Cp_filt=pl.when(pl.col("Cp") < 0).then(0.0).otherwise(pl.col("Cp"))
     )
-    # df = df.with_columns(Ct_filt=pl.when((pl.col("Ct") < 0) | (pl.col("Ct") > 1.25)).then(0.0).otherwise(pl.col("Ct")))
-    # Format data for plotting
+
     df_piv_unified_Cp = (
         df.filter(pl.col("method") == "unified")
         .pivot(index="tsr", columns="pitch", values="Cp_filt", aggregate_function=None)
@@ -193,11 +194,6 @@ if __name__ == "__main__":
     Ct_madsen[(Ct_unified > 1.25)] = 1.51
     Cp_unified[Cp_unified < 0.05] = 0.05
     Cp_madsen[Cp_madsen < 0.05] = 0.05
-    # Cp_unified[Cp_unified <= 0.0] =np.nan
-    # Cp_madsen[Cp_madsen <= 0.0] =np.nan
-    # Ct[(np.isnan(Ct)) | (Ct <= 0)] = 0.2
-    # Ct_unified[(Ct_unified <= 0)] = 0.2
-    # Ct_madsen[(Ct_madsen <= 0)] = 0.2
 
     # Plotting
     fig, axes = plt.subplots(
@@ -213,16 +209,6 @@ if __name__ == "__main__":
     CS = axes[1].contour(pitch, tsr, Cp_madsen, levels=levels, colors="k")
     axes[1].clabel(CS, inline=True, fontsize=10)
 
-    # #CT
-    # levels = np.arange(0.0, 1.26, 0.25)
-    # axes[1][0].contourf(pitch, tsr, Ct_unified, levels=levels, cmap="viridis")
-    # CS = axes[1][0].contour(pitch, tsr, Ct_unified, levels=levels, colors="k")
-    # axes[1][0].clabel(CS, inline=True, fontsize=10)
-
-    # axes[1][1].contourf(pitch, tsr, Ct_madsen, levels=levels, cmap="viridis")
-    # CS = axes[1][1].contour(pitch, tsr, Ct_madsen, levels=levels, colors="k")
-    # axes[1][1].clabel(CS, inline=True, fontsize=10)
-
     # diff
     Cp_diff = np.abs(Cp_unified - Cp_madsen)
     Cp_diff[np.abs(Cp_diff) < 0.01] = 0.01
@@ -231,13 +217,6 @@ if __name__ == "__main__":
     CS = axes[2].contour(pitch, tsr, Cp_diff, levels=levels, colors="k")
     axes[2].clabel(CS, inline=True, fontsize=10)
     print(np.max(np.abs(Cp_diff)))
-    # axes[1][2].contourf(pitch, tsr, Ct_diff, levels=levels, cmap="viridis")
-    # CS = axes[1][2].contour(pitch, tsr, Ct_diff, levels=levels, colors="k")
-    # axes[1][2].clabel(CS, inline=True, fontsize=10)
-
-    # axes[1].contourf(pitch, tsr, Ct, levels=levels, cmap="plasma")
-    # CS = axes[1].contour(pitch, tsr, Ct, levels=levels, colors="k")
-    # axes[1].clabel(CS, inline=True, fontsize=10)
 
     # Plot points of interest
     for key, (pitch, tsr) in points_of_interest.items():
@@ -247,11 +226,13 @@ if __name__ == "__main__":
 
     axes[1].set_xlabel("Pitch [deg]")
     axes[0].set_ylabel("Tip Speed Ratio [-]")
-    axes[0].set_title("$C_P$ (unified momentum)", fontsize="small")
+    axes[0].set_title("$C_P$ (Unified momentum)", fontsize="small")
     axes[1].set_title("$C_P$ (Madsen (2020))", fontsize="small")
-    axes[2].set_title("absolute difference", fontsize="small")
+    axes[2].set_title("Absolute difference", fontsize="small")
 
-    axes[1].set_xlabel("Pitch [deg]")
+    axes[1].set_xlabel("Blade Pitch Angle [deg]")
+
+    [ax.set_xticks(np.arange(-10, 21, 10)) for ax in axes]
 
     axes[2].legend(loc="lower center", fontsize="xx-small")
     plt.savefig(fig_fn, dpi=300, bbox_inches="tight")
