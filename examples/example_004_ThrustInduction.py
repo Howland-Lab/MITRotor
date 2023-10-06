@@ -16,7 +16,7 @@ FIGDIR.mkdir(exist_ok=True, parents=True)
 CT_a_methods = {
     # "Fixed": ThrustInduction.FixedInduction(),
     "UnifiedMomentum": ThrustInduction.CTaUnifiedMomentum(),
-    "Heck": ThrustInduction.Heck(),
+    "Heck": ThrustInduction.CTaHeck(),
     "Madsen": ThrustInduction.Madsen(),
 }
 

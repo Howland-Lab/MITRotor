@@ -13,13 +13,13 @@ class MomentumSolution:
 
     Ctprime: float
     yaw: float
-    # beta: float
     an: Union[float, npt.ArrayLike]
     u4: Union[float, npt.ArrayLike]
     v4: Union[float, npt.ArrayLike]
     dp: Union[float, npt.ArrayLike]
     niter: int
     converged: bool
+    beta: float
 
     @property
     def solution(self):
@@ -76,7 +76,7 @@ class LimitedHeck(MomentumBase):
             / (4 + Ctprime * np.cos(yaw) ** 2) ** 2
         )
         dp = 0.0 * a
-        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, 1, True)
+        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, 1, True, 0)
 
 
 class Heck(MomentumBase):
@@ -117,7 +117,7 @@ class Heck(MomentumBase):
         else:
             a, u4, v4 = np.nan * np.zeros_like(x0)
         dp = np.zeros_like(a)
-        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged)
+        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, 0)
 
     def residual(self, x: np.ndarray, Ctprime: float, yaw: float) -> np.ndarray:
         """
@@ -222,7 +222,7 @@ class UnifiedMomentum(MomentumBase):
         else:
             a, u4, v4, dp = np.nan * np.zeros_like(x0)
 
-        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged)
+        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, self.beta)
 
 
 class ThrustBasedUnified(UnifiedMomentum):
@@ -274,4 +274,4 @@ class ThrustBasedUnified(UnifiedMomentum):
         else:
             a, u4, v4, dp, Ctprime = np.nan * np.zeros_like(x0)
 
-        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged)
+        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, self.beta)
