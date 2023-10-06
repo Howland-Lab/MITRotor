@@ -117,7 +117,9 @@ class Heck(MomentumBase):
         else:
             a, u4, v4 = np.nan * np.zeros_like(x0)
         dp = np.zeros_like(a)
-        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, 0)
+        return MomentumSolution(
+            Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, 0
+        )
 
     def residual(self, x: np.ndarray, Ctprime: float, yaw: float) -> np.ndarray:
         """
@@ -222,7 +224,9 @@ class UnifiedMomentum(MomentumBase):
         else:
             a, u4, v4, dp = np.nan * np.zeros_like(x0)
 
-        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, self.beta)
+        return MomentumSolution(
+            Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, self.beta
+        )
 
 
 class ThrustBasedUnified(UnifiedMomentum):
@@ -274,4 +278,6 @@ class ThrustBasedUnified(UnifiedMomentum):
         else:
             a, u4, v4, dp, Ctprime = np.nan * np.zeros_like(x0)
 
-        return MomentumSolution(Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, self.beta)
+        return MomentumSolution(
+            Ctprime, yaw, a, u4, v4, dp, sol.niter, sol.converged, self.beta
+        )

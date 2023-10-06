@@ -70,7 +70,7 @@ if __name__ == "__main__":
     for method in methods:
         sol = BEM(rotor, Cta_method=method, Nr=100).solve(PITCH, TSR)
         out[method] = sol
-        print(sol.converged, sol.inner_niter, sol.outer_niter)
+        print(sol.converged, sol.inner_niter, sol.outer_niter, sol.Cp())
 
     fig, axes = plt.subplots(
         len(to_plot), 1, sharex=True, figsize=1.2 * np.array((4, 4))

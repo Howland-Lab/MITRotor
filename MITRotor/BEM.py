@@ -439,6 +439,7 @@ class BEM(_BEMSolverBase):
 
         residual = np.vstack([e_an, e_aprime])
 
+        # breakpoint()
         return residual
 
     def update_aerodynamics(
@@ -472,11 +473,13 @@ class BEM(_BEMSolverBase):
         sol._Ctan = sol._Cl * np.sin(sol._phi) - sol._Cd * np.cos(sol._phi)
 
         # Tip-loss correction
-        sol._tiploss = self.tiploss_func(sol.mu_mesh, sol._phi)
+        sol._tiploss = annulus_average(
+            self.sol.theta_mesh, self.tiploss_func(sol.mu_mesh, sol._phi)
+        )
 
         sol._Ct = sol.solidity * annulus_average(
             self.sol.theta_mesh,
-            self.sol._tiploss * sol._W**2 * sol._Cax,
+            sol._W**2 * sol._Cax,
         )
 
         sol._Ctprime = sol._Ct / ((1 - an) ** 2 * np.cos(sol.yaw) ** 2)

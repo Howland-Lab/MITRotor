@@ -20,7 +20,7 @@ FIGDIR.mkdir(exist_ok=True, parents=True)
 
 fig_fn = FIGDIR / "example_006_pitch_tsr.png"
 
-FN_PITCH_TSR = Path("pitch_tsr_blag.csv")
+FN_PITCH_TSR = Path("pitch_tsr_blag_new_tiploss.csv")
 
 
 def func(x):
@@ -28,7 +28,7 @@ def func(x):
     relax = 0.5 if method == "madsen" else 0.25
     sol = BEM(rotor, Cta_method=method, outer_relax=relax).solve(np.deg2rad(pitch), tsr)
 
-    if sol.converged:
+    if True:  # sol.converged:
         return dict(
             method=method,
             pitch=pitch,

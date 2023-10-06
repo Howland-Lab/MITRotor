@@ -36,21 +36,25 @@ def build_cta_model(cta_model: Union[str, CtaModel]) -> CtaModel:
 
 
 class Madsen(CtaModel):
-    def Ct_a(self, Ct, yaw):
+    def Ct_a(self, Ct, yaw, tiploss=1):
         k3 = -0.6481 * yaw**3 + 2.1667 * yaw**2 - 2.0705 * yaw
         k2 = 0.8646 * yaw**3 - 2.6145 * yaw**2 + 2.1735 * yaw
         k1 = -0.1640 * yaw**3 + 0.4438 * yaw**2 - 0.5136 * yaw
-        CT_lim = np.minimum(Ct, 0.9)
+        CT_lim = np.clip(Ct, 0.0, 0.9)
 
         Ka = k3 * np.abs(CT_lim) ** 3 + k2 * CT_lim**2 + k1 * np.abs(CT_lim) + 1.0
 
-        a = Ct**3 * 0.0883 + Ct**2 * 0.0586 + Ct * 0.2460
+        Ct_tiploss = np.clip(Ct / tiploss, 0.0, 2.0)
+        a = Ct_tiploss**3 * 0.0883 + Ct_tiploss**2 * 0.0586 + Ct_tiploss * 0.2460
 
         a_corrected = a * Ka
-        return np.minimum(a_corrected, 2.0)
+        return np.clip(a_corrected, 0.0, 2.0)
 
     def __call__(self, sol: "BEMSolution") -> "BEMSolution":
-        sol._a = self.Ct_a(sol._Ct, sol.yaw)
+        sol._a = self.Ct_a(sol._Ct, sol.yaw, tiploss=sol._tiploss)
+        sol._a[sol.mu < 0.05] = 0.0
+        sol._a[sol.mu > 0.97] = 0.0
+        sol._Ctan[sol.mu > 0.97] = 0.0
 
         return sol
 
@@ -68,7 +72,9 @@ class CTaUnifiedMomentum(CtaModel):
     def __call__(self, sol: "BEMSolution") -> "BEMSolution":
         x0 = np.vstack([sol._a, sol._u4, sol._v4, sol._dp])
 
-        momentum_sol = self.model_Ctprime.solve(sol._Ctprime, sol.yaw, x0)
+        momentum_sol = self.model_Ctprime.solve(
+            sol._Ctprime / np.maximum(sol._tiploss, 0.01), sol.yaw, x0
+        )
         sol._a, sol._u4, sol._v4, sol._dp = momentum_sol.solution
 
         sol.inner_niter = np.maximum(sol.inner_niter, momentum_sol.niter)
