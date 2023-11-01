@@ -41,7 +41,6 @@ class MomentumSolution:
         """Returns the near wake length, x0."""
         return (
             np.cos(self.yaw)
-            / 2
             * np.sqrt(((1 - self.an) * np.cos(self.yaw)) / (1 + self.u4))
             / (2 / (1 + self.u4) * (self.beta * (1 - self.u4) / 2))
         )
@@ -189,7 +188,7 @@ class UnifiedMomentum(MomentumBase):
             * (1 - an) ** 2
             * np.cos(yaw) ** 2
             * np.arctan(
-                (2 / (1 + u4))
+                (1 / (1 + u4))
                 * (self.beta * np.abs((1 - u4)) / 2)
                 / ((np.cos(yaw) / 2) * np.sqrt((1 - an) * np.cos(yaw) / (1 + u4)))
             )
