@@ -15,7 +15,9 @@ class NonlinearADPressureField:
     solving a nonlinear Poisson equation on a rectangular grid.
     """
 
-    def __init__(self, Lx=60.0, Ly=60.0, dx=0.1, dy=1.0, ddp=0.05, iterations=3):
+    def __init__(
+        self, Lx=60.0, Ly=60.0, dx=0.1, dy=1.0, ddp=0.05, iterations=3, relax=0.0
+    ):
         """
         Lx (float) : x-dimension of the rectangular grid
         Ly (float) : y-dimension of the rectangular grid
@@ -26,15 +28,16 @@ class NonlinearADPressureField:
         """
         self.geometry = EquidistantRectGridEven(Lx, Ly, dx, dy)
         self.max_iter = iterations + 1
+        self.relax = relax
 
-        dps, xs, ps = self._generate_pressure_table(ddp, dx)
+        dps, xs, ps = self._generate_pressure_table(ddp, dx, xmax=Lx/2)
 
         self.interpolator = RegularGridInterpolator(
             [dps, xs], ps, bounds_error=False, fill_value=0
         )
 
     def _generate_pressure_table(
-        self, ddp: float, dx: float, xmax=20
+        self, ddp: float, dx: float, xmax=30
     ) -> Tuple[ArrayLike, ...]:
         """
         Generate interpolation table by solving nonlinear PDE
@@ -75,14 +78,23 @@ class NonlinearADPressureField:
             ArrayLike: centerline pressure values at x
         """
 
+        fields = []
+
+        def callback(object, i):
+            fields.append(object.sol_NL.p)
+
         pde = NonLinearPoisson(self.geometry, dP=dp)
-        sol_tot, sol_f, sol_g = pde.solve(max_iter=self.max_iter)
+        sol_tot, sol_f, sol_g = pde.solve(
+            max_iter=self.max_iter, relax=self.relax, callback=callback
+        )
+
+        combined_field = np.min(fields, axis=0)
 
         x_ = self.geometry.x
         y_ = self.geometry.y
 
         interpolator = RegularGridInterpolator(
-            [x_, y_], sol_g.p, bounds_error=False, fill_value=0
+            [x_, y_], combined_field, bounds_error=False, fill_value=0
         )
 
         out = interpolator((x, 0), method="linear")
