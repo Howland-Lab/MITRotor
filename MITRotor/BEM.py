@@ -1,485 +1,392 @@
-from functools import wraps
-from typing import Tuple, Union
+from functools import wraps, cached_property
+from typing import Tuple, Union, Optional, Callable, Protocol
+from dataclasses import dataclass, field
 
 import numpy as np
-import numpy.typing as npt
+from numpy.typing import ArrayLike
 
 from . import ThrustInduction, Tiploss
 from .RotorDefinition import RotorDefinition
-from .Utilities import adaptivefixedpointiteration, fixedpointiteration
+from .Geometry import BEMGeometry
+from UnifiedMomentumModel.Utilities.FixedPointIteration import (
+    fixedpointiteration,
+    FixedPointIterationResult,
+)
 
 
-class _BEMSolverBase:
-    def __init__(
+class TiplossModel(Protocol):
+    def __call__(
         self,
-        rotor: RotorDefinition,
-        Cta_method: Union[str, ThrustInduction.CtaModel] = "Unified",
-        tiploss: Union[str, Tiploss.TiplossModel] = "PrandtlRootTip",
-        Nr=20,
-        Ntheta=21,
+        aero_props: "AerodynamicProperties",
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: "RotorDefinition",
+        geometry: "BEMGeometry",
     ):
-        self.rotor = rotor
-
-        self.Nr, self.Ntheta = Nr, Ntheta
-
-        self.mu, self.theta, self.mu_mesh, self.theta_mesh = self.calc_gridpoints(
-            Nr, Ntheta
-        )
-
-        self.Cta_func = ThrustInduction.build_cta_model(Cta_method)
-        self.tiploss_func = Tiploss.build_tiploss_model(tiploss, rotor)
-
-        self._solidity = self.rotor.solidity(self.mu_mesh)
-
-    def solve(self):
         ...
 
-    @classmethod
-    def calc_gridpoints(cls, Nr: int, Ntheta: int) -> Tuple[npt.ArrayLike, ...]:
-        mu = np.linspace(0.0, 1.0, Nr)
-        theta = np.linspace(0.0, 2 * np.pi, Ntheta)
 
-        theta_mesh, mu_mesh = np.meshgrid(theta, mu)
-
-        return mu, theta, mu_mesh, theta_mesh
-
-    def gridpoints_cart(self, yaw: float) -> Tuple[npt.ArrayLike, ...]:
-        """
-        Returns the grid point locations in cartesian coordinates
-        nondimensionialized by rotor radius. Origin is located at hub center.
-
-        Note: effect of yaw angle on grid points is not yet implemented.
-        """
-        # Probable sign error here.
-        X = np.zeros_like(self.mu_mesh)
-        Y = self.mu_mesh * np.sin(self.theta_mesh)  # lateral
-        Z = self.mu_mesh * np.cos(self.theta_mesh)  # vertical
-
-        return X, Y, Z
-
-    def _sample_windfield(self, windfield):
-        yaw = 0  # To do: change grid points based on yaw angle.
-        _X, _Y, _Z = self.gridpoints_cart(yaw)
-        Y = _Y
-        Z = self.rotor.hub_height / self.rotor.R + _Z
-
-        U = windfield.wsp(Y, Z)
-        wdir = windfield.wdir(Y, Z)
-
-        return U, wdir
-
-
-def calc_gridpoints(Nr, Ntheta):
-    mu = np.linspace(0.0, 0.999, Nr)
-    theta = np.linspace(0.0, 2 * np.pi, Ntheta)
-
-    theta_mesh, mu_mesh = np.meshgrid(theta, mu)
-
-    return mu, theta, mu_mesh, theta_mesh
-
-
-def decompose(func):
+def fullgrid(func):
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        decomp = kwargs.pop("decomp", False)
-        X = func(self, *args, **kwargs)
-        if not decomp:
-            return rotor_average(self.mu, X)
+    def wrapper(self, grid=None, **kwargs):
+        # Assuming the function returns a grid of values
+        quantity = func(self, grid, **kwargs)
+
+        if grid == "full":
+            return quantity  # No averaging
+
+        elif grid == "azim":
+            raise NotImplementedError
+
+        elif grid == "radial":
+            return self.geom.annulus_average(quantity)
+
+        elif grid is None:
+            return self.geom.rotor_average(self.geom.annulus_average(quantity))
+
         else:
-            return X
+            raise ValueError(f"Unsupported average type: {grid}")
 
     return wrapper
 
 
-def doubledecompose(func):
+def radialgrid(func):
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        decomp = kwargs.pop("decomp", False)
-        doubledecomp = kwargs.pop("doubledecomp", False)
-        X = func(self, *args, **kwargs)
-        if doubledecomp:
-            return X
-        if decomp:
-            return annulus_average(self.theta_mesh, X)
+    def wrapper(self, grid=None, **kwargs):
+        # Assuming the function returns a grid of values
+        quantity = func(self, grid, **kwargs)
+
+        if grid == "full":
+            raise ValueError("Cannot return radial quantity on a full polar grid.")
+
+        elif grid == "azim":
+            raise NotImplementedError
+
+        elif grid == "radial":
+            return quantity
+
+        elif grid is None:
+            return self.geom.rotor_average(quantity)
+
         else:
-            return rotor_average(self.mu, annulus_average(self.theta_mesh, X))
+            raise ValueError(f"Unsupported average type: {grid}")
 
     return wrapper
 
 
-def rotor_average(mu, X):
-    # Takes annulus average quantities and performs rotor average
+@dataclass
+class AerodynamicProperties:
+    # Radial grid
+    an: ArrayLike
+    aprime: ArrayLike
+    solidity: ArrayLike
+    # Full grid
+    Vax: ArrayLike
+    Vtan: ArrayLike
+    aoa: ArrayLike
+    Cl: ArrayLike
+    Cd: ArrayLike
+    F: Optional[ArrayLike] = None
 
-    X_rotor = 2 * np.trapz(X * mu, mu)
-    return X_rotor
+    def __post_init__(self):
+        pass
+
+    @cached_property
+    def W(self):
+        return np.sqrt(self.Vax**2 + self.Vtan**2)
+
+    @cached_property
+    def phi(self):
+        return np.arctan2(self.Vax, self.Vtan)
+
+    @cached_property
+    def Ctan(self):
+        return self.Cl * np.sin(self.phi) - self.Cd * np.cos(self.phi)
+
+    @cached_property
+    def Cax(self):
+        return self.Cl * np.cos(self.phi) + self.Cd * np.sin(self.phi)
 
 
-def annulus_average(theta_mesh, X):
-    X_azim = 1 / (2 * np.pi) * np.trapz(X, theta_mesh, axis=-1)
-
-    return X_azim
-
-
+@dataclass
 class BEMSolution:
-    def __init__(
-        self,
-        mu: npt.ArrayLike,
-        theta: npt.ArrayLike,
-        mu_mesh: npt.ArrayLike,
-        theta_mesh: npt.ArrayLike,
-        pitch: npt.ArrayLike,
-        tsr: npt.ArrayLike,
-        yaw: npt.ArrayLike,
-        U: npt.ArrayLike,
-        wdir: npt.ArrayLike,
-        R: float,
-    ):
-        self.mu, self.theta = mu, theta
-        self.mu_mesh, self.theta_mesh = mu_mesh, theta_mesh
-        self.Nr, self.Ntheta = len(mu), len(theta)
+    pitch: float
+    tsr: float
+    yaw: float
+    aero_props: AerodynamicProperties = field(repr=False)
+    geom: BEMGeometry = field(repr=False)
+    converged: bool
+    niter: int
 
-        self.pitch, self.tsr, self.yaw = pitch, tsr, yaw
-        self.U, self.wdir = U, wdir
+    @radialgrid
+    def a(self, grid=None):
+        return self.aero_props.an
 
-        self.R = R
+    @radialgrid
+    def aprime(self, grid=None):
+        return self.aero_props.aprime
 
-        self._a = 1 / 3 * np.ones((self.Nr))
-        self._aprime = np.zeros((self.Nr))
-        self._Ctprime = np.zeros((self.Nr))
-        self._u4 = np.zeros((self.Nr))
-        self._v4 = np.zeros((self.Nr))
-        self._dp = np.zeros((self.Nr))
+    @radialgrid
+    def solidity(self, grid=None):
+        return self.aero_props.solidity
 
-        self.solidity = np.zeros((self.Nr))
+    @fullgrid
+    def Vax(self, grid=None):
+        return self.aero_props.Vax
 
-        # aerodynamic
-        self._phi = np.zeros((self.Nr, self.Ntheta))
-        self._aoa = np.zeros((self.Nr, self.Ntheta))
-        self._Vax = np.zeros((self.Nr, self.Ntheta))
-        self._Vtan = np.zeros((self.Nr, self.Ntheta))
-        self._W = np.zeros((self.Nr, self.Ntheta))
-        self._Cax = np.zeros((self.Nr, self.Ntheta))
-        self._Ctan = np.zeros((self.Nr, self.Ntheta))
-        self._tiploss = np.zeros((self.Nr, self.Ntheta))
+    @fullgrid
+    def Vtan(self, grid=None):
+        return self.aero_props.Vtan
 
-        # Convergence information
-        self.sampled_Ctprimes = []
-        self.converged = False
+    @fullgrid
+    def W(self, grid=None):
+        return self.aero_props.W
 
-    def zero_nans(self):
-        self._a[np.isnan(self._a)] = 0
-        self._aprime[np.isnan(self._aprime)] = 0
-        self._Ctprime[np.isnan(self._Ctprime)] = 0
-        self._u4[np.isnan(self._u4)] = 0
-        self._v4[np.isnan(self._v4)] = 0
-        self._dp[np.isnan(self._dp)] = 0
-        self._phi[np.isnan(self._phi)] = 0
-        self._aoa[np.isnan(self._aoa)] = 0
-        self._Vax[np.isnan(self._Vax)] = 0
-        self._Vtan[np.isnan(self._Vtan)] = 0
-        self._W[np.isnan(self._W)] = 0
-        self._Cax[np.isnan(self._Cax)] = 0
-        self._Ctan[np.isnan(self._Ctan)] = 0
-        self._tiploss[np.isnan(self._tiploss)] = 0
+    @fullgrid
+    def phi(self, grid=None):
+        return self.aero_props.phi
 
-    @decompose
-    def a(self):
-        return self._a
+    @fullgrid
+    def aoa(self, grid=None):
+        return self.aero_props.aoa
 
-    @decompose
+    @fullgrid
+    def Cl(self, grid=None):
+        return self.aero_props.Cl
+
+    @fullgrid
+    def Cd(self, grid=None):
+        return self.aero_props.Cd
+
+    @fullgrid
+    def Cax(self, grid=None):
+        return self.aero_props.Cax
+
+    @fullgrid
+    def Ctan(self, grid=None):
+        return self.aero_props.Ctan
+
+    @fullgrid
+    def F(self, grid=None):
+        return self.aero_props.F
+
     def u4(self):
         return self._u4
 
-    @decompose
     def v4(self):
         return self._v4
 
-    @decompose
     def dp(self):
         return self._dp
 
-    @decompose
-    def Ctprime(self):
-        return self._Ctprime
-
-    @decompose
-    def aprime(self):
-        return self._aprime
-
-    @decompose
-    def Cp(self):
-        integral = annulus_average(self.theta_mesh, self._W**2 * self._Ctan)
-        dCp = self.tsr * self.solidity * self.mu * integral
+    @radialgrid
+    def Cp(self, grid=None):
+        dCp = (
+            self.tsr
+            * self.solidity(grid="radial")
+            * self.geom.mu
+            * self.W(grid="radial") ** 2
+            * self.Ctan(grid="radial")
+        )
         return dCp
 
-    @decompose
-    def Ct(self):
-        dCt = self._Ctprime * (1 - self._a) ** 2 * np.cos(self.yaw) ** 2
-        return dCt
+    @radialgrid
+    def Ct(self, grid=None):
+        _Ct = (
+            self.solidity(grid="radial")
+            * self.W(grid="radial") ** 2
+            * self.Cax(grid="radial")
+        )
+        return _Ct
 
-    @decompose
-    def Cq(self):
-        return self.Cp(decomp=True) / self.tsr
+    @radialgrid
+    def Ctprime(self, grid=None):
+        Ctprime = self.Ct(grid="radial") / (
+            (1 - self.a(grid="radial")) ** 2 * np.cos(self.yaw) ** 2
+        )
+        return Ctprime
 
-    @doubledecompose
-    def phi(self):
-        return self._phi
+    @radialgrid
+    def Cq(self, grid=None):
+        return self.Cp(grid="radial") / self.tsr
 
-    @doubledecompose
-    def aoa(self):
-        return self._aoa
+    # @fullgrid
+    # def Fax(self, U_inf: float, rho=1.293) -> ArrayLike:
+    #     R = self.R
+    #     dR = self.geometry.dmu * R
+    #     A = self.geometry.mu_mesh * R * dR * self.geometry.dtheta
 
-    @doubledecompose
-    def Vax(self):
-        return self._Vax
+    #     return 0.5 * rho * U_inf**2 * self.Cax(doubledecomp=True) * A
 
-    @doubledecompose
-    def Vtan(self):
-        return self._Vtan
+    # @doubledecompose
+    # def Ftan(self, U_inf: float, rho=1.293) -> ArrayLike:
+    #     R = self.R
+    #     dR = self.geometry.dmu * R
+    #     A = self.geometry.mu_mesh * R * dR * self.geometry.dtheta
 
-    @doubledecompose
-    def W(self):
-        return self._W
+    #     return 0.5 * rho * U_inf**2 * self.Ctan(doubledecomp=True) * A
 
-    @doubledecompose
-    def Cax(self):
-        return self._Cax
+    # @decompose
+    # def thrust(self, U_inf: float, rho=1.293) -> ArrayLike:
+    #     R = self.R
+    #     dR = self.geometry.dmu * R
+    #     A = self.geometry.mu_mesh * R * dR * self.geometry.dtheta
 
-    @doubledecompose
-    def tiploss(self):
-        return self._tiploss
+    #     return 0.5 * rho * U_inf**2 * self.Ct(decomp=True) * A
 
-    @doubledecompose
-    def Ctan(self):
-        return self._Ctan
+    # @decompose
+    # def power(self, U_inf: float, rho=1.293) -> ArrayLike:
+    #     R = self.R
+    #     dR = self.geometry.dmu * R
+    #     A = self.geometry.mu_mesh * R * dR * self.geometry.dtheta
 
-    @doubledecompose
-    def Cl(self):
-        return self._Cl
+    #     return 0.5 * rho * U_inf**3 * self.Cp(decomp=True) * A
 
-    @doubledecompose
-    def Cd(self):
-        return self._Cd
+    # @decompose
+    # def torque(self, U_inf: float, rho=1.293) -> ArrayLike:
+    #     R = self.R
+    #     rotor_speed = self.tsr * U_inf / R
 
-    @doubledecompose
-    def Fax(self, U_inf: float, rho=1.293) -> npt.ArrayLike:
-        R = self.R
-        dR = np.diff(self.mu)[0] * R
-        dtheta = np.diff(self.theta)[0]
-        A = self.mu_mesh * R * dR * dtheta
+    #     return self.power(U_inf, rho=rho, decomp=True) / rotor_speed
 
-        return 0.5 * rho * U_inf**2 * self.Cax(doubledecomp=True) * A
-
-    @doubledecompose
-    def Ftan(self, U_inf: float, rho=1.293) -> npt.ArrayLike:
-        R = self.R
-        dR = np.diff(self.mu)[0] * R
-        dtheta = np.diff(self.theta)[0]
-
-        A = self.mu_mesh * R * dR * dtheta
-
-        return 0.5 * rho * U_inf**2 * self.Ctan(doubledecomp=True) * A
-
-    @decompose
-    def thrust(self, U_inf: float, rho=1.293) -> npt.ArrayLike:
-        R = self.R
-        dR = np.diff(self.mu)[0] * R
-        dtheta = np.diff(self.theta)[0]
-
-        A = self.mu * R * dR * dtheta
-
-        return 0.5 * rho * U_inf**2 * self.Ct(decomp=True) * A
-
-    @decompose
-    def power(self, U_inf: float, rho=1.293) -> npt.ArrayLike:
-        R = self.R
-        dR = np.diff(self.mu)[0] * R
-        dtheta = np.diff(self.theta)[0]
-
-        A = self.mu * R * dR * dtheta
-
-        return 0.5 * rho * U_inf**3 * self.Cp(decomp=True) * A
-
-    @decompose
-    def torque(self, U_inf: float, rho=1.293) -> npt.ArrayLike:
-        R = self.R
-        rotor_speed = self.tsr * U_inf / R
-
-        return self.power(U_inf, rho=rho, decomp=True) / rotor_speed
-
-    @doubledecompose
-    def REWS(self):
-        return self.U
+    # @doubledecompose
+    # def REWS(self):
+    #     return self.U
 
 
-class BEM(_BEMSolverBase):
+# TODO fixed point iteration decorator
+# @fixedpointiteration(max_iter=300, relaxation=0.25)
+@fixedpointiteration(max_iter=300, relaxation=0.7)
+class BEM:
+    """
+    A generic BEM class which facilitates dependency injection for various models.
+    Models which can be injected are:
+    - rotor definition
+    - BEM geometry
+    - aerodynamic properties calculation method
+    - tip loss method
+    - axial induction calculation method
+    - tangential induction calculation method
+    """
+
     def __init__(
         self,
         rotor: RotorDefinition,
-        tiploss: Union[str, Tiploss.TiplossModel] = "PrandtlRootTip",
-        Cta_method: Union[str, ThrustInduction.CtaModel] = "Unified",
-        beta=0.1403,
-        Nr=20,
-        Ntheta=21,
-        inner_maxiter=400,
-        inner_relax=0.25,
-        outer_maxiter=300,
-        outer_relax=0.25,
+        geometry: Optional[BEMGeometry] = None,
+        tiploss_model: Optional[TiplossModel] = None,
+        Cta_method: Optional[ThrustInduction.ThrustInductionModel] = None,
+        aprime_model: Optional[Callable] = None,
+        aero_model: Optional[Callable] = None,
     ):
         self.rotor = rotor
 
-        self.Nr, self.Ntheta = Nr, Ntheta
+        self.geometry: BEMGeometry = geometry or BEMGeometry(Nr=10, Ntheta=20)
+        self.calc_aerodynamics = aero_model or update_aerodynamics
+        self.calc_tiploss: TiplossModel = tiploss_model or Tiploss.PrandtlRootTip
+        self.calc_an: ThrustInduction.ThrustInductionModel = (
+            Cta_method or ThrustInduction.RotorAveragedHeck()
+        )
+        self.calc_aprime = aprime_model or calc_aprime
 
-        self.mu, self.theta, self.mu_mesh, self.theta_mesh = calc_gridpoints(Nr, Ntheta)
+        # self._solidity = self.rotor.solidity(self.geometry.mu)
 
-        self.tiploss_func = Tiploss.build_tiploss_model(tiploss, rotor)
-        self.momentum_model = ThrustInduction.build_cta_model(Cta_method)
-
-        self._solidity = self.rotor.solidity(self.mu)
-
-        self.beta = beta
-
-        self.inner_maxiter = inner_maxiter
-        self.inner_relax = inner_relax
-        self.outer_maxiter = outer_maxiter
-        self.outer_relax = outer_relax
-
-    def solve(
+    def initial_guess(
         self, pitch: float, tsr: float, yaw: float = 0.0, windfield=None
-    ) -> BEMSolution:
-        if callable(windfield):
-            self.U, self.wdir = self._sample_windfield(windfield)
-        elif windfield:
-            self.U, self.wdir = windfield
-        else:
-            self.U, self.wdir = np.ones_like(self.mu_mesh), np.zeros_like(self.mu_mesh)
+    ) -> Tuple[ArrayLike, ...]:
+        a = 1 / 3 * np.ones(self.geometry.Nr)
+        aprime = np.zeros(self.geometry.Nr)
 
-        self.sol = BEMSolution(
-            self.mu,
-            self.theta,
-            self.mu_mesh,
-            self.theta_mesh,
-            pitch,
-            tsr,
-            yaw,
-            self.U,
-            self.wdir,
-            self.rotor.R,
-        )
-        self.sol.inner_niter = 0
+        return a, aprime
 
-        self.sol.solidity = self._solidity
-        self.sol.beta = self.beta
-
-        a0 = 1 / 3 * np.ones(self.Nr)
-        aprime0 = np.zeros(self.Nr)
-
-        x0 = np.vstack([a0, aprime0])
-
-        FP_sol = fixedpointiteration(
-            self.residual, x0=x0, maxiter=self.outer_maxiter, relax=self.outer_relax
-        )
-
-        self.sol.converged = FP_sol.converged
-        self.sol.outer_niter = FP_sol.niter
-        self.sol.outer_relax = FP_sol.relax
-
-        if FP_sol.converged:
-            (
-                self.sol._a,
-                self.sol._aprime,
-            ) = FP_sol.x
-
-        self.sol.zero_nans()
-        return self.sol
-
-    def residual(self, x: npt.ArrayLike) -> npt.ArrayLike:
+    def residual(
+        self,
+        x: Tuple[ArrayLike, ...],
+        pitch: ArrayLike,
+        tsr: ArrayLike,
+        yaw: ArrayLike = 0.0,
+    ) -> Tuple[ArrayLike, ...]:
         an, aprime = x
 
-        self.update_aerodynamics(an, aprime)
-
-        tangential_integral = annulus_average(
-            self.sol.theta_mesh,
-            self.sol._W**2 * self.sol._Ctan,
+        # print(f"\nstart!")
+        aero_props = self.calc_aerodynamics(
+            an, aprime, pitch, tsr, yaw, self.rotor, self.geometry
         )
-
+        aero_props.F = self.calc_tiploss(
+            aero_props, pitch, tsr, yaw, self.rotor, self.geometry
+        )
+        e_an = self.calc_an(aero_props, pitch, tsr, yaw, self.rotor, self.geometry) - an
         e_aprime = (
-            self.sol.solidity
-            / (
-                4
-                * np.maximum(self.mu, 0.1) ** 2
-                * self.sol.tsr
-                * (1 - an)
-                * np.cos(self.sol.yaw)
-            )
-            * tangential_integral
-        ) - aprime
-
-        # x0 = np.vstack([self.sol._a, self.sol._u4, self.sol._v4, self.sol._dp])
-
-        # self.sol._a = an
-        self.sol = self.momentum_model(self.sol)
-        # mom_sol = self.momentum_model.solve(
-        #     self.sol._Ctprime,
-        #     self.sol.yaw,
-        #     x0,
-        #     maxiter=self.inner_maxiter,
-        #     relax=self.inner_relax,
-        # )
-
-        e_an = self.sol._a - an
-        # self.sol._a = mom_sol.an
-        self.sol._aprime = aprime
-        # self.sol._u4 = mom_sol.u4
-        # self.sol._v4 = mom_sol.v4
-        # self.sol._dp = mom_sol.dp
-        # self.sol.inner_niter = np.maximum(mom_sol.niter, self.sol.inner_niter)
-        # self.sol.inner_relax = self.inner_relax
-        self.sol.sampled_Ctprimes.extend(self.sol._Ctprime)
-
-        residual = np.vstack([e_an, e_aprime])
-
-        # breakpoint()
-        return residual
-
-    def update_aerodynamics(
-        self, an: npt.ArrayLike, aprime: npt.ArrayLike
-    ) -> npt.ArrayLike:
-        sol = self.sol
-
-        local_yaw = sol.wdir - sol.yaw
-        sol._Vax = sol.U * (
-            (1 - an[..., None])
-            * np.cos(local_yaw * np.cos(sol.theta_mesh))
-            * np.cos(local_yaw * np.sin(sol.theta_mesh))
-        )
-        sol._Vtan = (1 + aprime[..., None]) * sol.tsr * sol.mu_mesh - sol.U * (
-            1 - an[..., None]
-        ) * np.cos(local_yaw * np.sin(sol.theta_mesh)) * np.sin(
-            local_yaw * np.cos(sol.theta_mesh)
-        )
-        sol._W = np.sqrt(sol._Vax**2 + sol._Vtan**2)
-
-        # inflow angle
-        sol._phi = np.arctan2(sol._Vax, sol._Vtan)
-        sol._aoa = sol._phi - self.rotor.twist(sol.mu_mesh) - sol.pitch
-        sol._aoa = np.clip(sol._aoa, -np.pi / 2, np.pi / 2)
-
-        # Lift and drag coefficients
-        sol._Cl, sol._Cd = self.rotor.clcd(sol.mu_mesh, sol._aoa)
-
-        # axial and tangential force coefficients
-        sol._Cax = sol._Cl * np.cos(sol._phi) + sol._Cd * np.sin(sol._phi)
-        sol._Ctan = sol._Cl * np.sin(sol._phi) - sol._Cd * np.cos(sol._phi)
-
-        # Tip-loss correction
-        sol._tiploss = annulus_average(
-            self.sol.theta_mesh, self.tiploss_func(sol.mu_mesh, sol._phi)
+            self.calc_aprime(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
+            - aprime
         )
 
-        sol._Ct = sol.solidity * annulus_average(
-            self.sol.theta_mesh,
-            sol._W**2 * sol._Cax,
+        return e_an, e_aprime
+
+    def post_process(
+        self, result: FixedPointIterationResult, pitch, tsr, yaw
+    ) -> BEMSolution:
+        an, aprime = result.x
+        aero_props = self.calc_aerodynamics(
+            an, aprime, pitch, tsr, yaw, self.rotor, self.geometry
+        )
+        aero_props.F = self.calc_tiploss(
+            aero_props, pitch, tsr, yaw, self.rotor, self.geometry
         )
 
-        sol._Ctprime = sol._Ct / ((1 - an) ** 2 * np.cos(sol.yaw) ** 2)
+        return BEMSolution(
+            pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter
+        )
+
+
+def update_aerodynamics(
+    an: ArrayLike,
+    aprime: ArrayLike,
+    pitch: float,
+    tsr: float,
+    yaw: float,
+    rotor: RotorDefinition,
+    geom: BEMGeometry,
+) -> AerodynamicProperties:
+    wdir, U = 0, 1  # Todo: update this to take arbitrary wdir distributions
+    local_yaw = wdir - yaw
+    Vax = U * (
+        (1 - an[..., None])
+        * np.cos(local_yaw * np.cos(geom.theta_mesh))
+        * np.cos(local_yaw * np.sin(geom.theta_mesh))
+    )
+    Vtan = (1 + aprime[..., None]) * tsr * geom.mu_mesh - U * (
+        1 - an[..., None]
+    ) * np.cos(local_yaw * np.sin(geom.theta_mesh)) * np.sin(
+        local_yaw * np.cos(geom.theta_mesh)
+    )
+
+    phi = np.arctan2(Vax, Vtan)
+    aoa = phi - rotor.twist(geom.mu_mesh) - pitch
+    aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
+
+    Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
+
+    solidity = rotor.solidity(geom.mu)
+    aero_props = AerodynamicProperties(an, aprime, solidity, Vax, Vtan, aoa, Cl, Cd)
+
+    return aero_props
+
+
+def calc_aprime(
+    aero_props: AerodynamicProperties,
+    pitch: float,
+    tsr: float,
+    yaw: float,
+    rotor: RotorDefinition,
+    geom: BEMGeometry,
+) -> ArrayLike:
+    tangential_integral = geom.annulus_average(aero_props.W**2 * aero_props.Ctan)
+
+    aprime = (
+        aero_props.solidity
+        / (4 * np.maximum(geom.mu, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(yaw))
+        * tangential_integral
+    )
+
+    return aprime
