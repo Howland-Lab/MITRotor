@@ -16,6 +16,7 @@ FIGDIR.mkdir(exist_ok=True, parents=True)
 CT_a_methods = {
     # "Fixed": ThrustInduction.FixedInduction(),
     "UnifiedMomentum": ThrustInduction.CTaUnifiedMomentum(),
+    "RotorAveragedUnifiedMomentum": ThrustInduction.CTaRotorAveragedUnifiedMomentum(),
     "Heck": ThrustInduction.CTaHeck(),
     "Madsen": ThrustInduction.Madsen(),
 }
@@ -24,6 +25,7 @@ CT_a_methods = {
 line_style = {
     # "Fixed": ThrustInduction.FixedInduction(),
     "UnifiedMomentum": "-",
+    "RotorAveragedUnifiedMomentum": "o-",
     "Heck": "--",
     "Madsen": ":",
 }

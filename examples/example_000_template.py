@@ -1,5 +1,4 @@
 from pathlib import Path
-import itertools
 
 
 import numpy as np
@@ -10,7 +9,7 @@ import matplotlib.pyplot as plt
 FIGDIR = Path("fig")
 FIGDIR.mkdir(exist_ok=True, parents=True)
 
-fig_fn = FIGDIR / "example_004_ThrustInduction.png"
+fig_fn = FIGDIR / "example_000_template.png"
 
 
 def main():

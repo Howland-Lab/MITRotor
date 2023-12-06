@@ -48,6 +48,7 @@ to_plot_label = {
 methods = [
     "madsen",
     "unified",
+    "rotoraveragedunified",
     # "heck",
     # "fixed",
 ]
@@ -55,22 +56,31 @@ methods = [
 method_labels = {
     "madsen": "Madsen (2020)",
     "unified": "Unified Momentum",
+    "rotoraveragedunified": "Rotor-averaged Unified Momentum",
+}
+relaxation = {
+    "madsen": 0.25,
+    "unified": 0.25,
+    "rotoraveragedunified": 0.25,
 }
 PITCH, TSR = np.deg2rad(-10), 10
+PITCH, TSR = np.deg2rad(0), 7
 
 
 def main():
-    pass
-
-
-if __name__ == "__main__":
-    main()
-
     out = {}
     for method in methods:
-        sol = BEM(rotor, Cta_method=method, Nr=100).solve(PITCH, TSR)
+        print()
+        print(f"Simulating rotor using {method=}")
+        print(f"at {np.rad2deg(PITCH)=:.2f} deg, {TSR=:.2f}...")
+
+        sol = BEM(
+            rotor, Cta_method=method, Nr=100, outer_relax=relaxation[method]
+        ).solve(PITCH, TSR)
         out[method] = sol
-        print(sol.converged, sol.inner_niter, sol.outer_niter, sol.Cp())
+
+        print("converged!" if sol.converged else "not converged!")
+        print(f"{sol.outer_niter=}")
 
     fig, axes = plt.subplots(
         len(to_plot), 1, sharex=True, figsize=1.2 * np.array((4, 4))
@@ -87,3 +97,9 @@ if __name__ == "__main__":
     axes[0].legend(ncol=len(methods), bbox_to_anchor=(0.5, 1.05), loc="lower center")
 
     plt.savefig(fig_fn, dpi=300, bbox_inches="tight")
+
+    return all([x.converged for x in out.values()])
+
+
+if __name__ == "__main__":
+    main()

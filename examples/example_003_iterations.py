@@ -6,7 +6,8 @@ import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
 
-from MITRotor import MomentumTheory
+from UnifiedMomentumModel import Momentum
+
 from MITRotor.Utilities import for_each
 
 FIGDIR = Path("fig")
@@ -14,9 +15,10 @@ FIGDIR.mkdir(exist_ok=True, parents=True)
 
 
 momentum_theories = {
-    "Limited Heck": MomentumTheory.LimitedHeck(),
-    "Heck": MomentumTheory.Heck(),
-    "Unified Momentum": MomentumTheory.UnifiedMomentum(),
+    "Limited Heck": Momentum.LimitedHeck(),
+    "Heck": Momentum.Heck(),
+    "Unified Momentum": Momentum.UnifiedMomentum(),
+    "Unified Momentum (linear)": Momentum.UnifiedMomentum(cached=False, max_iter=0),
 }
 
 
@@ -24,7 +26,7 @@ def func(x):
     yaw, Ctprime, method = x
 
     model = momentum_theories[method]
-    sol = model.solve(Ctprime, np.deg2rad(yaw))
+    sol = model(Ctprime, np.deg2rad(yaw))
 
     return dict(
         method=method,

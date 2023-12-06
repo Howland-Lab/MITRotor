@@ -4,16 +4,16 @@ import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
 
-from MITRotor import MomentumTheory
+from UnifiedMomentumModel import Momentum
 
 FIGDIR = Path("fig")
 FIGDIR.mkdir(exist_ok=True, parents=True)
 
 
 momentum_theories = {
-    "Limited Heck": MomentumTheory.LimitedHeck(),
-    "Heck": MomentumTheory.Heck(),
-    "Unified Momentum": MomentumTheory.UnifiedMomentum(),
+    "Limited Heck": Momentum.LimitedHeck(),
+    "Heck": Momentum.Heck(),
+    "Unified Momentum (linear)": Momentum.UnifiedMomentum(),
 }
 
 
@@ -22,7 +22,7 @@ def main():
     Ctprime = np.linspace(0, 100, 500)
     out = {}
     for key, model in momentum_theories.items():
-        sol = model.solve(Ctprime, yaw)
+        sol = model(Ctprime, yaw)
         data = np.vstack(
             [
                 sol.an,
