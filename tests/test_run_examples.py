@@ -27,3 +27,9 @@ def test_example_004():
 
     for args in args_to_test:
         func(args)
+
+
+def test_example_005():
+    from examples.example_005_BEM import main
+
+    assert main()
