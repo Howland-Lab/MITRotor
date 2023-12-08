@@ -31,9 +31,7 @@ def main():
         axes[2].plot(sol.Ct, sol.v4, label=key)
         axes[3].plot(sol.Ct, sol.dp, label=key)
     axes[0].legend()
-    plt.savefig(
-        FIGDIR / "example_001_momentum_aligned.png", dpi=300, bbox_inches="tight"
-    )
+    plt.savefig(FIGDIR / "example_001_momentum_aligned.png", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":

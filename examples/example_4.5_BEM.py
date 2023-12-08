@@ -3,15 +3,15 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from MITRotor.BEM import BEM
-from MITRotor.ReferenceTurbines import IEA15MW
+from MITRotor.ReferenceTurbines import IEA10MW
 from MITRotor.Geometry import BEMGeometry
 
 
-figdir = Path("fig_new")
+figdir = Path("fig")
 figdir.mkdir(exist_ok=True, parents=True)
 
 if __name__ == "__main__":
-    rotor = IEA15MW()
+    rotor = IEA10MW()
     geometry = BEMGeometry(Nr=100, Ntheta=20)
     bem = BEM(rotor=rotor, geometry=geometry)
     out = bem(0.0, 7.0, 0.0)

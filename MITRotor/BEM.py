@@ -1,5 +1,5 @@
 from functools import wraps, cached_property
-from typing import Tuple, Union, Optional, Callable, Protocol
+from typing import Tuple, Optional, Callable, Protocol
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -8,10 +8,8 @@ from numpy.typing import ArrayLike
 from . import ThrustInduction, Tiploss
 from .RotorDefinition import RotorDefinition
 from .Geometry import BEMGeometry
-from UnifiedMomentumModel.Utilities.FixedPointIteration import (
-    fixedpointiteration,
-    FixedPointIterationResult,
-)
+from UnifiedMomentumModel.Utilities.FixedPointIteration import fixedpointiteration, FixedPointIterationResult
+from UnifiedMomentumModel.Momentum import Heck
 
 
 class TiplossModel(Protocol):
@@ -119,6 +117,10 @@ class BEMSolution:
     converged: bool
     niter: int
 
+    def __post_init__(self):
+        sol = Heck()(self.Ctprime(), self.yaw)
+        self._u4, self._v4 = sol.u4, sol.v4
+
     @radialgrid
     def a(self, grid=None):
         return self.aero_props.an
@@ -177,34 +179,19 @@ class BEMSolution:
     def v4(self):
         return self._v4
 
-    def dp(self):
-        return self._dp
-
     @radialgrid
     def Cp(self, grid=None):
-        dCp = (
-            self.tsr
-            * self.solidity(grid="radial")
-            * self.geom.mu
-            * self.W(grid="radial") ** 2
-            * self.Ctan(grid="radial")
-        )
+        dCp = self.tsr * self.solidity(grid="radial") * self.geom.mu * self.W(grid="radial") ** 2 * self.Ctan(grid="radial")
         return dCp
 
     @radialgrid
     def Ct(self, grid=None):
-        _Ct = (
-            self.solidity(grid="radial")
-            * self.W(grid="radial") ** 2
-            * self.Cax(grid="radial")
-        )
+        _Ct = self.solidity(grid="radial") * self.W(grid="radial") ** 2 * self.Cax(grid="radial")
         return _Ct
 
     @radialgrid
     def Ctprime(self, grid=None):
-        Ctprime = self.Ct(grid="radial") / (
-            (1 - self.a(grid="radial")) ** 2 * np.cos(self.yaw) ** 2
-        )
+        Ctprime = self.Ct(grid="radial") / ((1 - self.a(grid="radial")) ** 2 * np.cos(self.yaw) ** 2)
         return Ctprime
 
     @radialgrid
@@ -255,9 +242,7 @@ class BEMSolution:
     #     return self.U
 
 
-# TODO fixed point iteration decorator
-# @fixedpointiteration(max_iter=300, relaxation=0.25)
-@fixedpointiteration(max_iter=300, relaxation=0.7)
+@fixedpointiteration(max_iter=300, relaxation=0.25)
 class BEM:
     """
     A generic BEM class which facilitates dependency injection for various models.
@@ -284,16 +269,12 @@ class BEM:
         self.geometry: BEMGeometry = geometry or BEMGeometry(Nr=10, Ntheta=20)
         self.calc_aerodynamics = aero_model or update_aerodynamics
         self.calc_tiploss: TiplossModel = tiploss_model or Tiploss.PrandtlRootTip
-        self.calc_an: ThrustInduction.ThrustInductionModel = (
-            Cta_method or ThrustInduction.RotorAveragedHeck()
-        )
+        self.calc_an: ThrustInduction.ThrustInductionModel = Cta_method or ThrustInduction.RotorAveragedHeck()
         self.calc_aprime = aprime_model or calc_aprime
 
         # self._solidity = self.rotor.solidity(self.geometry.mu)
 
-    def initial_guess(
-        self, pitch: float, tsr: float, yaw: float = 0.0, windfield=None
-    ) -> Tuple[ArrayLike, ...]:
+    def initial_guess(self, pitch: float, tsr: float, yaw: float = 0.0, windfield=None) -> Tuple[ArrayLike, ...]:
         a = 1 / 3 * np.ones(self.geometry.Nr)
         aprime = np.zeros(self.geometry.Nr)
 
@@ -308,35 +289,19 @@ class BEM:
     ) -> Tuple[ArrayLike, ...]:
         an, aprime = x
 
-        # print(f"\nstart!")
-        aero_props = self.calc_aerodynamics(
-            an, aprime, pitch, tsr, yaw, self.rotor, self.geometry
-        )
-        aero_props.F = self.calc_tiploss(
-            aero_props, pitch, tsr, yaw, self.rotor, self.geometry
-        )
+        aero_props = self.calc_aerodynamics(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry)
+        aero_props.F = self.calc_tiploss(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
         e_an = self.calc_an(aero_props, pitch, tsr, yaw, self.rotor, self.geometry) - an
-        e_aprime = (
-            self.calc_aprime(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
-            - aprime
-        )
+        e_aprime = self.calc_aprime(aero_props, pitch, tsr, yaw, self.rotor, self.geometry) - aprime
 
         return e_an, e_aprime
 
-    def post_process(
-        self, result: FixedPointIterationResult, pitch, tsr, yaw
-    ) -> BEMSolution:
+    def post_process(self, result: FixedPointIterationResult, pitch, tsr, yaw) -> BEMSolution:
         an, aprime = result.x
-        aero_props = self.calc_aerodynamics(
-            an, aprime, pitch, tsr, yaw, self.rotor, self.geometry
-        )
-        aero_props.F = self.calc_tiploss(
-            aero_props, pitch, tsr, yaw, self.rotor, self.geometry
-        )
+        aero_props = self.calc_aerodynamics(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry)
+        aero_props.F = self.calc_tiploss(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
 
-        return BEMSolution(
-            pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter
-        )
+        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter)
 
 
 def update_aerodynamics(
@@ -350,16 +315,10 @@ def update_aerodynamics(
 ) -> AerodynamicProperties:
     wdir, U = 0, 1  # Todo: update this to take arbitrary wdir distributions
     local_yaw = wdir - yaw
-    Vax = U * (
-        (1 - an[..., None])
-        * np.cos(local_yaw * np.cos(geom.theta_mesh))
-        * np.cos(local_yaw * np.sin(geom.theta_mesh))
-    )
-    Vtan = (1 + aprime[..., None]) * tsr * geom.mu_mesh - U * (
-        1 - an[..., None]
-    ) * np.cos(local_yaw * np.sin(geom.theta_mesh)) * np.sin(
-        local_yaw * np.cos(geom.theta_mesh)
-    )
+    Vax = U * ((1 - an[..., None]) * np.cos(local_yaw * np.cos(geom.theta_mesh)) * np.cos(local_yaw * np.sin(geom.theta_mesh)))
+    Vtan = (1 + aprime[..., None]) * tsr * geom.mu_mesh - U * (1 - an[..., None]) * np.cos(
+        local_yaw * np.sin(geom.theta_mesh)
+    ) * np.sin(local_yaw * np.cos(geom.theta_mesh))
 
     phi = np.arctan2(Vax, Vtan)
     aoa = phi - rotor.twist(geom.mu_mesh) - pitch
@@ -368,25 +327,19 @@ def update_aerodynamics(
     Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
 
     solidity = rotor.solidity(geom.mu)
+
     aero_props = AerodynamicProperties(an, aprime, solidity, Vax, Vtan, aoa, Cl, Cd)
 
     return aero_props
 
 
 def calc_aprime(
-    aero_props: AerodynamicProperties,
-    pitch: float,
-    tsr: float,
-    yaw: float,
-    rotor: RotorDefinition,
-    geom: BEMGeometry,
+    aero_props: AerodynamicProperties, pitch: float, tsr: float, yaw: float, rotor: RotorDefinition, geom: BEMGeometry
 ) -> ArrayLike:
     tangential_integral = geom.annulus_average(aero_props.W**2 * aero_props.Ctan)
 
     aprime = (
-        aero_props.solidity
-        / (4 * np.maximum(geom.mu, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(yaw))
-        * tangential_integral
+        aero_props.solidity / (4 * np.maximum(geom.mu, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(yaw)) * tangential_integral
     )
 
     return aprime

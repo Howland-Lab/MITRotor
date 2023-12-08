@@ -34,19 +34,8 @@ def main():
                 yaw * np.ones_like(sol.an),
             ]
         )
-        _df = pl.DataFrame(
-            data, schema=["an", "Ct", "Ctprime", "u4", "v4", "dp", "yaw"]
-        ).with_columns(pl.lit(key).alias("model"))
-        _df = _df.with_columns(
-            (
-                1
-                / 2
-                * pl.col("Ctprime")
-                * (1 - pl.col("an"))
-                * np.cos(pl.col("yaw")) ** 2
-                - 1
-            ).alias("blah")
-        )
+        _df = pl.DataFrame(data, schema=["an", "Ct", "Ctprime", "u4", "v4", "dp", "yaw"]).with_columns(pl.lit(key).alias("model"))
+        _df = _df.with_columns((1 / 2 * pl.col("Ctprime") * (1 - pl.col("an")) * np.cos(pl.col("yaw")) ** 2 - 1).alias("blah"))
         out[key] = _df
 
     to_plot = ["u4", "v4", "blah", "dp", "Ct"]

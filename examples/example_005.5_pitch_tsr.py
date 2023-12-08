@@ -6,27 +6,25 @@ from typing import Dict
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
+from foreach import foreach
 
 from MITRotor.BEM import BEM
-from MITRotor.ReferenceTurbines import IEA15MW
+from MITRotor.ReferenceTurbines import IEA10MW
 from MITRotor.Geometry import BEMGeometry
 
-from MITRotor.Utilities import for_each
-
-rotor = IEA15MW()
 
 # Use Latex Fonts
 plt.rcParams.update({"text.usetex": True, "font.family": "serif"})
 
-FIGDIR = Path("fig_new")
+FIGDIR = Path("fig")
 FIGDIR.mkdir(exist_ok=True, parents=True)
 
 fig_fn = FIGDIR / "example_005.5_pitch_tsr.png"
 
-REGENERATE = False
+REGENERATE = True
 FN_PITCH_TSR = Path("pitch_tsr.csv")
 
-rotor = IEA15MW()
+rotor = IEA10MW()
 geometry = BEMGeometry(Nr=100, Ntheta=20)
 bem = BEM(rotor=rotor, geometry=geometry)
 
@@ -64,29 +62,19 @@ if __name__ == "__main__":
     if FN_PITCH_TSR.exists() and not REGENERATE:
         df = pl.read_csv(FN_PITCH_TSR)
     else:
-        out = for_each(func, params, parallel=True)
+        out = foreach(func, params, parallel=True)
         df = pl.from_dicts(out)
         df.write_csv(FN_PITCH_TSR)
 
     print(df)
-    df_Cp = (
-        df.pivot(index="tsr", columns="pitch", values="Cp", aggregate_function=None)
-        .fill_nan(None)
-        .interpolate()
-    )
-    df_Ct = (
-        df.pivot(index="tsr", columns="pitch", values="Ct", aggregate_function=None)
-        .fill_nan(None)
-        .interpolate()
-    )
+    df_Cp = df.pivot(index="tsr", columns="pitch", values="Cp", aggregate_function=None).fill_nan(None).interpolate()
+    df_Ct = df.pivot(index="tsr", columns="pitch", values="Ct", aggregate_function=None).fill_nan(None).interpolate()
     tsr = df_Cp["tsr"].to_numpy()
     pitch = np.array(df_Cp.columns[1:], dtype=float)
     Cp = np.maximum(df_Cp.to_numpy()[:, 1:], 0.025)
     Ct = np.maximum(df_Ct.to_numpy()[:, 1:], 0.05)
 
-    fig, axes = plt.subplots(
-        1, 2, sharey=True, sharex=True, figsize=1.5 * np.array((4.5, 3))
-    )
+    fig, axes = plt.subplots(1, 2, sharey=True, sharex=True, figsize=1.5 * np.array((4.5, 3)))
     # CP
     levels = np.arange(0.0, 0.61, 0.05)
     axes[0].contourf(pitch, tsr, Cp, levels=levels, cmap="viridis")

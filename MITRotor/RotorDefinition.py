@@ -41,9 +41,7 @@ class BladeAirfoils:
         airfoil_grid_adjusted = (hub_radius + airfoil_grid * (R - hub_radius)) / R
         airfoil_order = blade["outer_shape_bem"]["airfoil_position"]["labels"]
 
-        airfoils = {
-            x["name"]: Airfoil.from_windio_airfoil(x, R) for x in windio["airfoils"]
-        }
+        airfoils = {x["name"]: Airfoil.from_windio_airfoil(x, R) for x in windio["airfoils"]}
 
         return cls(D, airfoil_grid_adjusted, airfoil_order, airfoils, N=N)
 
@@ -54,12 +52,8 @@ class BladeAirfoils:
         cl = np.array([airfoils[name].Cl(aoa_grid) for name in airfoil_order])
         cd = np.array([airfoils[name].Cd(aoa_grid) for name in airfoil_order])
 
-        self.cl_interp = interpolate.RegularGridInterpolator(
-            (airfoil_grid, aoa_grid), cl, bounds_error=False, fill_value=None
-        )
-        self.cd_interp = interpolate.RegularGridInterpolator(
-            (airfoil_grid, aoa_grid), cd, bounds_error=False, fill_value=None
-        )
+        self.cl_interp = interpolate.RegularGridInterpolator((airfoil_grid, aoa_grid), cl, bounds_error=False, fill_value=None)
+        self.cd_interp = interpolate.RegularGridInterpolator((airfoil_grid, aoa_grid), cd, bounds_error=False, fill_value=None)
 
     def Cl(self, x, inflow):
         return self.cl_interp((x, inflow))
@@ -99,14 +93,10 @@ class RotorDefinition:
 
         # grid including hub center and cone angle
         twist_grid = (hub_radius + np.array(data_twist["grid"]) * (R - hub_radius)) / R
-        twist_func = interpolate.interp1d(
-            twist_grid, data_twist["values"], fill_value="extrapolate"
-        )
+        twist_func = interpolate.interp1d(twist_grid, data_twist["values"], fill_value="extrapolate")
         # grid including hub center and cone angle
         chord_grid = (hub_radius + np.array(data_chord["grid"]) * (R - hub_radius)) / R
-        chord_func = interpolate.interp1d(
-            chord_grid, data_chord["values"], fill_value="extrapolate"
-        )
+        chord_func = interpolate.interp1d(chord_grid, data_chord["values"], fill_value="extrapolate")
 
         solidity_func = lambda mu: np.minimum(
             N_blades * chord_func(mu) / (2 * np.pi * np.maximum(mu, 0.0001) * R),

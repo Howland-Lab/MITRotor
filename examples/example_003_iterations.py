@@ -5,10 +5,10 @@ import itertools
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
+from foreach import foreach
 
 from UnifiedMomentumModel import Momentum
 
-from MITRotor.Utilities import for_each
 
 FIGDIR = Path("fig")
 FIGDIR.mkdir(exist_ok=True, parents=True)
@@ -48,7 +48,7 @@ def main():
     methods = list(momentum_theories.keys())
 
     params = list(itertools.product(yaw, Ctprime, methods))
-    out = for_each(func, params, parallel=False)
+    out = foreach(func, params, parallel=False)
     df = pl.from_dicts(out)
     print(df)
 

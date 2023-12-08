@@ -67,9 +67,7 @@ def main():
     plt.xlabel("$a$")
     plt.ylabel("$C_T$")
 
-    plt.savefig(
-        FIGDIR / "example_004_ThrustInduction.png", dpi=300, bbox_inches="tight"
-    )
+    plt.savefig(FIGDIR / "example_004_ThrustInduction.png", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":

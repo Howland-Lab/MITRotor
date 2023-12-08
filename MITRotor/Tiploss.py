@@ -43,19 +43,9 @@ def PrandtlRootTip(
 ):
     phi = geometry.annulus_average(aero_props.phi)
     R_hub = rotor.hub_radius / rotor.R
-    f_tip = (
-        rotor.N_blades
-        / 2
-        * (1 - geometry.mu)
-        / (np.maximum(geometry.mu, 0.0001) * np.abs(np.sin(phi)))
-    )
+    f_tip = rotor.N_blades / 2 * (1 - geometry.mu) / (np.maximum(geometry.mu, 0.0001) * np.abs(np.sin(phi)))
     F_tip = 2 / np.pi * np.arccos(np.clip(np.exp(-np.clip(f_tip, -100, 100)), -1, 1))
-    f_hub = (
-        rotor.N_blades
-        / 2
-        * (geometry.mu - R_hub)
-        / (np.maximum(geometry.mu, 0.0001) * np.abs(np.sin(phi)))
-    )
+    f_hub = rotor.N_blades / 2 * (geometry.mu - R_hub) / (np.maximum(geometry.mu, 0.0001) * np.abs(np.sin(phi)))
     F_hub = 2 / np.pi * np.arccos(np.clip(np.exp(-np.clip(f_hub, -100, 100)), -1, 1))
 
     return np.maximum(F_hub * F_tip, 0.00001)

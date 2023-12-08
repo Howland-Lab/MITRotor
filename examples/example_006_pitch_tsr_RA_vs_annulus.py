@@ -157,9 +157,7 @@ if __name__ == "__main__":
 
     # # plot
 
-    df = df.with_columns(
-        Cp_filt=pl.when(pl.col("Cp") < 0).then(0.0).otherwise(pl.col("Cp"))
-    )
+    df = df.with_columns(Cp_filt=pl.when(pl.col("Cp") < 0).then(0.0).otherwise(pl.col("Cp")))
 
     df_piv_unified_Cp = (
         df.filter(pl.col("method") == "unified")
@@ -203,9 +201,7 @@ if __name__ == "__main__":
     Cp_rotoraveragedunified[Cp_rotoraveragedunified < 0.05] = 0.05
 
     # Plotting
-    fig, axes = plt.subplots(
-        1, 3, sharey=True, sharex=True, figsize=1.5 * np.array((4.5, 3))
-    )
+    fig, axes = plt.subplots(1, 3, sharey=True, sharex=True, figsize=1.5 * np.array((4.5, 3)))
     # CP
     levels = np.arange(0.0, 0.61, 0.1)
     axes[0].contourf(pitch, tsr, Cp_unified, levels=levels, cmap="viridis")
