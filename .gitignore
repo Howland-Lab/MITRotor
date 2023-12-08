@@ -3,6 +3,7 @@
 
 
 fig
+fig*
 *.mat
 *.npz
 *.csv

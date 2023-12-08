@@ -11,6 +11,7 @@ python = ">=3.8, <=3.9"
 numpy = ">=1.16.5, <1.23.0"
 scipy = ">=1.6, <1.7.3"
 unified-momentum-model = {git = "git@github.com:Howland-Lab/Unified-Momentum-Model.git"}
+foreach = "^0.1.0"
 
 [tool.poetry.group.dev.dependencies]
 black = { extras = ["jupyter"], version = "^23.9.1" }
@@ -19,6 +20,7 @@ jupyter = "^1.0.0"
 mypy = "^1.5.1"
 pytest = "^7.4.2"
 ruff = "^0.1.7"
+ipykernel = "^6.25.1"
 
 [tool.poetry.group.examples]
 optional = true
@@ -35,4 +37,7 @@ build-backend = "poetry.core.masonry.api"
 
 
 [tool.black]
+line-length = 130
+
+[tool.ruff]
 line-length = 130
