@@ -11,6 +11,8 @@ from MITRotor.ReferenceTurbines import IEA10MW
 from Torque2024.cache import cache_polars
 from Torque2024.shared_generation import find_optimal_setpoint, KOmega, ContourData, find_power_maximising_Ctprime_setpoints
 
+# Use Latex Fonts
+plt.rcParams.update({"text.usetex": True, "font.family": "serif"})
 
 FIGDIR = Path("fig")
 FIGDIR.mkdir(exist_ok=True, parents=True)
