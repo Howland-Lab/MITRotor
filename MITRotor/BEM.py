@@ -8,7 +8,7 @@ from numpy.typing import ArrayLike
 from . import ThrustInduction, Tiploss
 from .RotorDefinition import RotorDefinition
 from .Geometry import BEMGeometry
-from UnifiedMomentumModel.Utilities.FixedPointIteration import fixedpointiteration, FixedPointIterationResult
+from UnifiedMomentumModel.Utilities.FixedPointIteration import adaptivefixedpointiteration, FixedPointIterationResult
 from UnifiedMomentumModel.Momentum import Heck
 
 
@@ -242,7 +242,7 @@ class BEMSolution:
     #     return self.U
 
 
-@fixedpointiteration(max_iter=300, relaxation=0.25)
+@adaptivefixedpointiteration(max_iter=500, relaxations=[0.25, 0.5, 0.96])
 class BEM:
     """
     A generic BEM class which facilitates dependency injection for various models.
