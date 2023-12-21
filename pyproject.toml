@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "MITRotor"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Jaime Liew <jaimeliew1@gmail.com>"]
 readme = "README.md"
