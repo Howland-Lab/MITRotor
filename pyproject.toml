@@ -4,7 +4,7 @@ version = "0.1.1"
 description = ""
 authors = ["Jaime Liew <jaimeliew1@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "MITRotor" }, {include = "Torque2024"}]
+packages = [{ include = "MITRotor" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
