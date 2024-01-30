@@ -315,8 +315,9 @@ def update_aerodynamics(
 ) -> AerodynamicProperties:
     wdir, U = 0, 1  # Todo: update this to take arbitrary wdir distributions
     local_yaw = wdir - yaw
-    Vax = U * ((1 - an[..., None]) * np.cos(local_yaw * np.cos(geom.theta_mesh)) * np.cos(local_yaw * np.sin(geom.theta_mesh)))
-    Vtan = (1 + aprime[..., None]) * tsr * geom.mu_mesh - U * (1 - an[..., None]) * np.cos(
+
+    Vax = U * ((1 - np.expand_dims(an, axis=-1)) * np.cos(local_yaw * np.cos(geom.theta_mesh)) * np.cos(local_yaw * np.sin(geom.theta_mesh)))
+    Vtan = (1 + np.expand_dims(aprime, axis=-1)) * tsr * geom.mu_mesh - U * (1 - np.expand_dims(an, axis=-1)) * np.cos(
         local_yaw * np.sin(geom.theta_mesh)
     ) * np.sin(local_yaw * np.cos(geom.theta_mesh))
 
