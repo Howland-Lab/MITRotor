@@ -52,14 +52,14 @@ class BladeAirfoils:
         cl = np.array([airfoils[name].Cl(aoa_grid) for name in airfoil_order])
         cd = np.array([airfoils[name].Cd(aoa_grid) for name in airfoil_order])
 
-        self.cl_interp = interpolate.RegularGridInterpolator((airfoil_grid, aoa_grid), cl, bounds_error=False, fill_value=None)
-        self.cd_interp = interpolate.RegularGridInterpolator((airfoil_grid, aoa_grid), cd, bounds_error=False, fill_value=None)
+        self.cl_interp = interpolate.RectBivariateSpline(airfoil_grid, aoa_grid, cl)
+        self.cd_interp = interpolate.RectBivariateSpline(airfoil_grid, aoa_grid, cd)
 
     def Cl(self, x, inflow):
-        return self.cl_interp((x, inflow))
+        return self.cl_interp(x, inflow, grid=False)
 
     def Cd(self, x, inflow):
-        return self.cd_interp((x, inflow))
+        return self.cd_interp(x, inflow, grid=False)
 
     def __call__(self, x, inflow):
         return self.Cl(x, inflow), self.Cd(x, inflow)
