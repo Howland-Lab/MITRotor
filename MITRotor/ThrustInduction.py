@@ -42,7 +42,7 @@ class Constant(ThrustInductionModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        return self.a * np.ones_like(aero_props.a)
+        return self.a * np.ones_like(aero_props.an)
 
 
 # def calc_an(
@@ -95,7 +95,7 @@ class Madsen(ThrustInductionModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
+        Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
         a = self.Ct_a(Ct, yaw, tiploss=aero_props.F)
         a[geom.mu < 0.05] = 0.0
         a[geom.mu > 0.99] = 0.0
@@ -121,7 +121,7 @@ class Heck(ThrustInductionModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
+        Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
 
         return self.Ct_a(Ct, yaw)
 
@@ -181,8 +181,8 @@ class UnifiedMomentum(ThrustInductionModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
-        Ctprime = Ct / ((1 - aero_props.a) ** 2 * np.cos(yaw) ** 2)
+        Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
+        Ctprime = Ct / ((1 - aero_props.an) ** 2 * np.cos(yaw) ** 2)
         momentum_sol = self.model_Ctprime(Ctprime / np.maximum(aero_props.F, 0.01), yaw)
 
         return momentum_sol.an
