@@ -1,5 +1,5 @@
-from functools import wraps, cached_property
-from typing import Tuple, Optional, Callable, Protocol
+from functools import wraps
+from typing import Tuple, Optional, Callable, Protocol, Literal
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -8,6 +8,8 @@ from numpy.typing import ArrayLike
 from . import ThrustInduction, Tiploss
 from .RotorDefinition import RotorDefinition
 from .Geometry import BEMGeometry
+from .Aerodynamics import AerodynamicProperties, HowlandAerodynamics
+from .TangentialInduction import calc_aprime
 from UnifiedMomentumModel.Utilities.FixedPointIteration import adaptivefixedpointiteration, FixedPointIterationResult
 from UnifiedMomentumModel.Momentum import Heck
 
@@ -27,7 +29,7 @@ class TiplossModel(Protocol):
 
 def fullgrid(func):
     @wraps(func)
-    def wrapper(self, grid=None, **kwargs):
+    def wrapper(self, grid: Literal["averaged", "full", "radial"] = "averaged", **kwargs):
         # Assuming the function returns a grid of values
         quantity = func(self, grid, **kwargs)
 
@@ -40,7 +42,7 @@ def fullgrid(func):
         elif grid == "radial":
             return self.geom.annulus_average(quantity)
 
-        elif grid is None:
+        elif grid == "averaged":
             return self.geom.rotor_average(self.geom.annulus_average(quantity))
 
         else:
@@ -74,42 +76,6 @@ def radialgrid(func):
 
 
 @dataclass
-class AerodynamicProperties:
-    # Radial grid
-    an: ArrayLike
-    aprime: ArrayLike
-    solidity: ArrayLike
-    # Full grid
-    U: ArrayLike
-    wdir: ArrayLike
-    Vax: ArrayLike
-    Vtan: ArrayLike
-    aoa: ArrayLike
-    Cl: ArrayLike
-    Cd: ArrayLike
-    F: Optional[ArrayLike] = None
-
-    def __post_init__(self):
-        pass
-
-    @cached_property
-    def W(self):
-        return np.sqrt(self.Vax**2 + self.Vtan**2)
-
-    @cached_property
-    def phi(self):
-        return np.arctan2(self.Vax, self.Vtan)
-
-    @cached_property
-    def Ctan(self):
-        return self.Cl * np.sin(self.phi) - self.Cd * np.cos(self.phi)
-
-    @cached_property
-    def Cax(self):
-        return self.Cl * np.cos(self.phi) + self.Cd * np.sin(self.phi)
-
-
-@dataclass
 class BEMSolution:
     pitch: float
     tsr: float
@@ -124,63 +90,63 @@ class BEMSolution:
         self._u4, self._v4 = sol.u4, sol.v4
 
     @radialgrid
-    def a(self, grid=None):
+    def a(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.an
 
     @radialgrid
-    def aprime(self, grid=None):
+    def aprime(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.aprime
 
     @radialgrid
-    def solidity(self, grid=None):
+    def solidity(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.solidity
 
     @fullgrid
-    def U(self, grid=None):
+    def U(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.U
 
     @fullgrid
-    def wdir(self, grid=None):
+    def wdir(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.wdir
 
     @fullgrid
-    def Vax(self, grid=None):
+    def Vax(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.Vax
 
     @fullgrid
-    def Vtan(self, grid=None):
+    def Vtan(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.Vtan
 
     @fullgrid
-    def W(self, grid=None):
+    def W(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.W
 
     @fullgrid
-    def phi(self, grid=None):
+    def phi(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.phi
 
     @fullgrid
-    def aoa(self, grid=None):
+    def aoa(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.aoa
 
     @fullgrid
-    def Cl(self, grid=None):
+    def Cl(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.Cl
 
     @fullgrid
-    def Cd(self, grid=None):
+    def Cd(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.Cd
 
     @fullgrid
-    def Cax(self, grid=None):
+    def Cax(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.Cax
 
     @fullgrid
-    def Ctan(self, grid=None):
+    def Ctan(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.Ctan
 
     @fullgrid
-    def F(self, grid=None):
+    def F(self, grid: Literal["averaged", "full", "radial"] = "averaged"):
         return self.aero_props.F
 
     def u4(self):
@@ -191,7 +157,13 @@ class BEMSolution:
 
     @radialgrid
     def Cp(self, grid=None):
-        dCp = self.tsr * self.solidity(grid="radial") * self.geom.mu * self.W(grid="radial") ** 2 * self.Ctan(grid="radial")
+        dCp = (
+            self.tsr
+            * self.solidity(grid="radial")
+            * self.geom.mu
+            * self.W(grid="radial") ** 2
+            * self.Ctan(grid="radial")
+        )
         return dCp
 
     @radialgrid
@@ -273,7 +245,7 @@ class BEM:
         self.rotor = rotor
 
         self.geometry: BEMGeometry = geometry or BEMGeometry(Nr=10, Ntheta=20)
-        self.calc_aerodynamics = aero_model or update_aerodynamics
+        self.calc_aerodynamics = aero_model or HowlandAerodynamics
         self.calc_tiploss: TiplossModel = tiploss_model or Tiploss.PrandtlRootTip
         self.calc_an: ThrustInduction.ThrustInductionModel = Cta_method or ThrustInduction.RotorAveragedHeck()
         self.calc_aprime = aprime_model or calc_aprime
@@ -316,52 +288,3 @@ class BEM:
         aero_props.F = self.calc_tiploss(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
 
         return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter)
-
-
-def update_aerodynamics(
-    an: ArrayLike,
-    aprime: ArrayLike,
-    pitch: float,
-    tsr: float,
-    yaw: float,
-    rotor: RotorDefinition,
-    geom: BEMGeometry,
-    U: ArrayLike,
-    wdir: ArrayLike,
-) -> AerodynamicProperties:
-    local_yaw = wdir - yaw
-
-    Vax = U * (
-        (1 - np.expand_dims(an, axis=-1))
-        * np.cos(local_yaw * np.cos(geom.theta_mesh))
-        * np.cos(local_yaw * np.sin(geom.theta_mesh))
-    )
-    Vtan = (1 + np.expand_dims(aprime, axis=-1)) * tsr * geom.mu_mesh - U * (1 - np.expand_dims(an, axis=-1)) * np.cos(
-        local_yaw * np.sin(geom.theta_mesh)
-    ) * np.sin(local_yaw * np.cos(geom.theta_mesh))
-
-    phi = np.arctan2(Vax, Vtan)
-    aoa = phi - rotor.twist(geom.mu_mesh) - pitch
-    aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
-
-    Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
-
-    solidity = rotor.solidity(geom.mu)
-
-    aero_props = AerodynamicProperties(
-        an, aprime, solidity, U * np.ones(geom.shape), wdir * np.ones(geom.shape), Vax, Vtan, aoa, Cl, Cd
-    )
-
-    return aero_props
-
-
-def calc_aprime(
-    aero_props: AerodynamicProperties, pitch: float, tsr: float, yaw: float, rotor: RotorDefinition, geom: BEMGeometry
-) -> ArrayLike:
-    tangential_integral = geom.annulus_average(aero_props.W**2 * aero_props.Ctan)
-
-    aprime = (
-        aero_props.solidity / (4 * np.maximum(geom.mu, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(yaw)) * tangential_integral
-    )
-
-    return aprime
