@@ -3019,9 +3019,9 @@ autodiff = ["dualitic @ git+https://github.com/jaimeliew1/Dualitic.git"]
 
 [package.source]
 type = "git"
-url = "git@github.com:Howland-Lab/Unified-Momentum-Model.git"
+url = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"
 reference = "HEAD"
-resolved_reference = "1f3da96157c17e34c19c8cef734cf4e7f852cb52"
+resolved_reference = "3a76b0bd31747a109e5886a3fa6ed78b5b323286"
 
 [[package]]
 name = "uri-template"
@@ -3136,4 +3136,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "08e8770c9d5441980a4cfec5aa6a0316be2ded42b2d51969fce6fd325c1b1ef7"
+content-hash = "0ec11d31892c0f8aa629eeea4fd844b5bf35ead8b6ba9922ba94a610423ccb06"
