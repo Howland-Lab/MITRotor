@@ -11,6 +11,7 @@ python = "^3.8"
 numpy = ">=1.16.5"
 scipy = ">=1.6"
 unified-momentum-model = {git = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"}
+pyyaml = "^6.0.1"
 
 [tool.poetry.group.dev.dependencies]
 black = { extras = ["jupyter"], version = "^23.9.1" }
