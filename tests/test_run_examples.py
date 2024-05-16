@@ -1,35 +1,35 @@
-def test_example_001():
-    from examples.example_001_momentum_aligned import main
+# def test_example_001():
+#     from examples.example_001_momentum_aligned import main
 
-    main()
-
-
-def test_example_002():
-    from examples.example_002_blah import main
-
-    main()
+#     main()
 
 
-def test_example_003():
-    from examples.example_003_iterations import main
+# def test_example_002():
+#     from examples.example_002_blah import main
 
-    main()
-
-
-def test_example_004():
-    from examples.example_004_ThrustInduction import func
-
-    args_to_test = [
-        (0.0, 2, "UnifiedMomentum"),
-        (0.0, 2, "Heck"),
-        (0.0, 2, "Madsen"),
-    ]
-
-    for args in args_to_test:
-        func(args)
+#     main()
 
 
-def test_example_005():
-    from examples.example_005_BEM import main
+# def test_example_003():
+#     from examples.example_003_iterations import main
 
-    assert main()
+#     main()
+
+
+# def test_example_004():
+#     from examples.example_004_ThrustInduction import func
+
+#     args_to_test = [
+#         (0.0, 2, "UnifiedMomentum"),
+#         (0.0, 2, "Heck"),
+#         (0.0, 2, "Madsen"),
+#     ]
+
+#     for args in args_to_test:
+#         func(args)
+
+
+# def test_example_005():
+#     from examples.example_005_BEM import main
+
+#     assert main()

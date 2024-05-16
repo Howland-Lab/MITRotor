@@ -1,30 +1,20 @@
-from functools import wraps
-from typing import Tuple, Optional, Callable, Protocol, Literal
 from dataclasses import dataclass, field
+from functools import wraps
+from typing import Callable, Literal, Optional, Protocol, Tuple
 
 import numpy as np
 from numpy.typing import ArrayLike
-
-from . import ThrustInduction, Tiploss
-from .RotorDefinition import RotorDefinition
-from .Geometry import BEMGeometry
-from .Aerodynamics import AerodynamicProperties, HowlandAerodynamics
-from .TangentialInduction import calc_aprime
-from UnifiedMomentumModel.Utilities.FixedPointIteration import adaptivefixedpointiteration, FixedPointIterationResult
 from UnifiedMomentumModel.Momentum import Heck
+from UnifiedMomentumModel.Utilities.FixedPointIteration import (
+    FixedPointIterationResult, adaptivefixedpointiteration)
 
-
-class TiplossModel(Protocol):
-    def __call__(
-        self,
-        aero_props: "AerodynamicProperties",
-        pitch: float,
-        tsr: float,
-        yaw: float,
-        rotor: "RotorDefinition",
-        geometry: "BEMGeometry",
-    ):
-        ...
+from . import Momentum, TipLoss
+from .Aerodynamics import (AerodynamicModel, AerodynamicProperties,
+                           DefaultAerodynamics)
+from .Geometry import BEMGeometry
+from .RotorDefinition import RotorDefinition
+from .TangentialInduction import (DefaultTangentialInduction,
+                                  TangentialInductionModel)
 
 
 def fullgrid(func):
@@ -156,7 +146,7 @@ class BEMSolution:
         return self._v4
 
     @radialgrid
-    def Cp(self, grid=None):
+    def Cp(self, grid: Literal["averaged", "radial"] = "averaged"):
         dCp = (
             self.tsr
             * self.solidity(grid="radial")
@@ -237,20 +227,23 @@ class BEM:
         self,
         rotor: RotorDefinition,
         geometry: Optional[BEMGeometry] = None,
-        tiploss_model: Optional[TiplossModel] = None,
-        Cta_method: Optional[ThrustInduction.ThrustInductionModel] = None,
-        aprime_model: Optional[Callable] = None,
-        aero_model: Optional[Callable] = None,
+        tiploss_model: Optional[TipLoss.TipLossModel] = None,
+        momentum_model: Optional[Momentum.MomentumModel] = None,
+        tangential_induction_model: Optional[TangentialInductionModel] = None,
+        aerodynamic_model: Optional[AerodynamicModel] = None,
     ):
         self.rotor = rotor
 
         self.geometry: BEMGeometry = geometry or BEMGeometry(Nr=10, Ntheta=20)
-        self.calc_aerodynamics = aero_model or HowlandAerodynamics
-        self.calc_tiploss: TiplossModel = tiploss_model or Tiploss.PrandtlRootTip
-        self.calc_an: ThrustInduction.ThrustInductionModel = Cta_method or ThrustInduction.RotorAveragedHeck()
-        self.calc_aprime = aprime_model or calc_aprime
+        self.aerodynamic_model = aerodynamic_model or DefaultAerodynamics()
+        self.tiploss_model: TipLoss.TipLossModel = tiploss_model or TipLoss.PrandtlTipLoss(root_loss=True)
+        self.calc_an: Momentum.MomentumModel = momentum_model or Momentum.HeckMomentum()
+        self.tangential_induction_model = tangential_induction_model or DefaultTangentialInduction()
 
         # self._solidity = self.rotor.solidity(self.geometry.mu)
+
+    def __call__(self, pitch: float, tsr: float, yaw: float) -> BEMSolution:
+        ...
 
     def sample_points(self, yaw: float = 0.0) -> tuple[ArrayLike, ArrayLike, ArrayLike]:
         X, Y, Z = self.geometry.cartesian(yaw)
@@ -275,16 +268,16 @@ class BEM:
     ) -> Tuple[ArrayLike, ...]:
         an, aprime = x
 
-        aero_props = self.calc_aerodynamics(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir)
-        aero_props.F = self.calc_tiploss(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
+        aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir)
+        aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
         e_an = self.calc_an(aero_props, pitch, tsr, yaw, self.rotor, self.geometry) - an
-        e_aprime = self.calc_aprime(aero_props, pitch, tsr, yaw, self.rotor, self.geometry) - aprime
+        e_aprime = self.tangential_induction_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry) - aprime
 
         return e_an, e_aprime
 
     def post_process(self, result: FixedPointIterationResult, pitch, tsr, yaw, U=1.0, wdir=0.0) -> BEMSolution:
         an, aprime = result.x
-        aero_props = self.calc_aerodynamics(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir)
-        aero_props.F = self.calc_tiploss(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
+        aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir)
+        aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
 
         return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter)

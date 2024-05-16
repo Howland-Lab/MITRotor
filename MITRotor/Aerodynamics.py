@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
@@ -9,8 +10,10 @@ from .RotorDefinition import RotorDefinition
 from .Geometry import BEMGeometry
 
 __all__ = [
+    "AerodynamicModel",
     "AerodynamicProperties",
-    "HowlandAerodynamics",
+    "DefaultAerodynamics",
+    "KraghAerodynamics",
 ]
 
 
@@ -87,58 +90,152 @@ class AerodynamicProperties:
         return self.Cl * np.cos(self.phi) + self.Cd * np.sin(self.phi)
 
 
-def HowlandAerodynamics(
-    an: ArrayLike,
-    aprime: ArrayLike,
-    pitch: float,
-    tsr: float,
-    yaw: float,
-    rotor: RotorDefinition,
-    geom: BEMGeometry,
-    U: ArrayLike,
-    wdir: ArrayLike,
-) -> AerodynamicProperties:
-    """
-    Performs the aerodynamic calculations in a blade-element code using the
-    method outlined in Howland et al. 2020. (Influence of atmospheric conditions
-    on the power production of utility-scale wind turbines in yaw misalignment)
+class AerodynamicModel(ABC):
+    @abstractmethod
+    def __call__(
+        self,
+        an: ArrayLike,
+        aprime: ArrayLike,
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: RotorDefinition,
+        geom: BEMGeometry,
+        U: ArrayLike,
+        wdir: ArrayLike,
+    ) -> AerodynamicProperties:
+        """
+        Performs the aerodynamic calculations in a blade-element code using the
+        method outlined in Howland et al. 2020. (Influence of atmospheric conditions
+        on the power production of utility-scale wind turbines in yaw misalignment)
 
-    Args:
-        an (ArrayLike): Axial induction radial profile.
-        aprime (ArrayLike): tangengial induction radial profile.
-        pitch (float): blade pitch angle [rad].
-        tsr (float): Rotor tip-speed ratio.
-        yaw (float): Rotor yaw angle [rad].
-        rotor (RotorDefinition): Turbine rotor definition object.
-        geom (BEMGeometry): Blade element geometry object.
-        U (ArrayLike): Inflow velocity on polar grid.
-        wdir (ArrayLike): Inflow direction on polar grid.
+        Args:
+            an (ArrayLike): Axial induction radial profile.
+            aprime (ArrayLike): tangengial induction radial profile.
+            pitch (float): blade pitch angle [rad].
+            tsr (float): Rotor tip-speed ratio.
+            yaw (float): Rotor yaw angle [rad].
+            rotor (RotorDefinition): Turbine rotor definition object.
+            geom (BEMGeometry): Blade element geometry object.
+            U (ArrayLike): Inflow velocity on polar grid.
+            wdir (ArrayLike): Inflow direction on polar grid.
 
-    Returns:
-        AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
+        Returns:
+            AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
-    """
-    local_yaw = wdir - yaw
+        """
+        ...
 
-    Vax = U * (
-        (1 - np.expand_dims(an, axis=-1))
-        * np.cos(local_yaw * np.cos(geom.theta_mesh))
-        * np.cos(local_yaw * np.sin(geom.theta_mesh))
-    )
-    Vtan = (1 + np.expand_dims(aprime, axis=-1)) * tsr * geom.mu_mesh - U * (1 - np.expand_dims(an, axis=-1)) * np.cos(
-        local_yaw * np.sin(geom.theta_mesh)
-    ) * np.sin(local_yaw * np.cos(geom.theta_mesh))
 
-    phi = np.arctan2(Vax, Vtan)
-    aoa = phi - rotor.twist(geom.mu_mesh) - pitch
-    aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
+class KraghAerodynamics(AerodynamicModel):
+    def __call__(
+        self,
+        an: ArrayLike,
+        aprime: ArrayLike,
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: RotorDefinition,
+        geom: BEMGeometry,
+        U: ArrayLike,
+        wdir: ArrayLike,
+    ) -> AerodynamicProperties:
+        """
+        Performs the aerodynamic calculations in a blade-element code using the
+        method outlined in Howland et al. 2020. (Influence of atmospheric conditions
+        on the power production of utility-scale wind turbines in yaw misalignment)
 
-    Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
+        Args:
+            an (ArrayLike): Axial induction radial profile.
+            aprime (ArrayLike): tangengial induction radial profile.
+            pitch (float): blade pitch angle [rad].
+            tsr (float): Rotor tip-speed ratio.
+            yaw (float): Rotor yaw angle [rad].
+            rotor (RotorDefinition): Turbine rotor definition object.
+            geom (BEMGeometry): Blade element geometry object.
+            U (ArrayLike): Inflow velocity on polar grid.
+            wdir (ArrayLike): Inflow direction on polar grid.
 
-    solidity = rotor.solidity(geom.mu)
+        Returns:
+            AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
-    aero_props = AerodynamicProperties(
-        an, aprime, solidity, U * np.ones(geom.shape), wdir * np.ones(geom.shape), Vax, Vtan, aoa, Cl, Cd
-    )
+        """
+        local_yaw = wdir - yaw
 
-    return aero_props
+        Vax = U * (
+            (1 - np.expand_dims(an, axis=-1))
+            * np.cos(local_yaw * np.cos(geom.theta_mesh))
+            * np.cos(local_yaw * np.sin(geom.theta_mesh))
+        )
+        Vtan = (1 + np.expand_dims(aprime, axis=-1)) * tsr * geom.mu_mesh - U * (
+            1 - np.expand_dims(an, axis=-1)
+        ) * np.cos(local_yaw * np.sin(geom.theta_mesh)) * np.sin(local_yaw * np.cos(geom.theta_mesh))
+
+        phi = np.arctan2(Vax, Vtan)
+        aoa = phi - rotor.twist(geom.mu_mesh) - pitch
+        aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
+
+        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
+
+        solidity = rotor.solidity(geom.mu)
+
+        aero_props = AerodynamicProperties(
+            an, aprime, solidity, U * np.ones(geom.shape), wdir * np.ones(geom.shape), Vax, Vtan, aoa, Cl, Cd
+        )
+
+        return aero_props
+
+
+class DefaultAerodynamics(AerodynamicModel):
+    def __call__(
+        self,
+        an: ArrayLike,
+        aprime: ArrayLike,
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: RotorDefinition,
+        geom: BEMGeometry,
+        U: ArrayLike,
+        wdir: ArrayLike,
+    ) -> AerodynamicProperties:
+        """
+        Performs the aerodynamic calculations in a blade-element code using the
+        method outlined in Howland et al. 2020. (Influence of atmospheric conditions
+        on the power production of utility-scale wind turbines in yaw misalignment)
+
+        Args:
+            an (ArrayLike): Axial induction radial profile.
+            aprime (ArrayLike): tangengial induction radial profile.
+            pitch (float): blade pitch angle [rad].
+            tsr (float): Rotor tip-speed ratio.
+            yaw (float): Rotor yaw angle [rad].
+            rotor (RotorDefinition): Turbine rotor definition object.
+            geom (BEMGeometry): Blade element geometry object.
+            U (ArrayLike): Inflow velocity on polar grid.
+            wdir (ArrayLike): Inflow direction on polar grid.
+
+        Returns:
+            AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
+
+        """
+        local_yaw = -yaw
+
+        Vax = U * ((1 - np.expand_dims(an, axis=-1)) * np.cos(local_yaw))
+        Vtan = (1 + np.expand_dims(aprime, axis=-1)) * tsr * geom.mu_mesh - U * np.cos(geom.theta_mesh) * np.sin(
+            local_yaw
+        )
+
+        phi = np.arctan2(Vax, Vtan)
+        aoa = phi - rotor.twist(geom.mu_mesh) - pitch
+        aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
+
+        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
+
+        solidity = rotor.solidity(geom.mu)
+
+        aero_props = AerodynamicProperties(
+            an, aprime, solidity, U * np.ones(geom.shape), wdir * np.ones(geom.shape), Vax, Vtan, aoa, Cl, Cd
+        )
+
+        return aero_props
