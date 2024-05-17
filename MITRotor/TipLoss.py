@@ -34,7 +34,7 @@ class NoTipLoss(TipLossModel):
         rotor: "RotorDefinition",
         geometry: "BEMGeometry",
     ):
-        return np.ones_like(geometry.mu)
+        return np.ones_like(geometry.mu_mesh)
 
 
 class PrandtlTipLoss(TipLossModel):
@@ -50,13 +50,20 @@ class PrandtlTipLoss(TipLossModel):
         rotor: "RotorDefinition",
         geometry: "BEMGeometry",
     ):
-        phi = geometry.annulus_average(aero_props.phi)
+        phi = aero_props.phi
         R_hub = rotor.hub_radius / rotor.R
-        f_tip = rotor.N_blades / 2 * (1 - geometry.mu) / (np.maximum(geometry.mu, 0.0001) * np.abs(np.sin(phi)))
+        f_tip = (
+            rotor.N_blades / 2 * (1 - geometry.mu_mesh) / (np.maximum(geometry.mu_mesh, 0.0001) * np.abs(np.sin(phi)))
+        )
         F_tip = 2 / np.pi * np.arccos(np.clip(np.exp(-np.clip(f_tip, -100, 100)), -0.9999, 0.9999))
 
         if self.root_loss:
-            f_hub = rotor.N_blades / 2 * (geometry.mu - R_hub) / (np.maximum(geometry.mu, 0.0001) * np.abs(np.sin(phi)))
+            f_hub = (
+                rotor.N_blades
+                / 2
+                * (geometry.mu_mesh - R_hub)
+                / (np.maximum(geometry.mu_mesh, 0.0001) * np.abs(np.sin(phi)))
+            )
             F_hub = 2 / np.pi * np.arccos(np.clip(np.exp(-np.clip(f_hub, -100, 100)), -0.9999, 0.9999))
 
             return np.maximum(F_hub * F_tip, 0.00001)

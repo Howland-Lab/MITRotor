@@ -162,14 +162,10 @@ class KraghAerodynamics(AerodynamicModel):
         """
         local_yaw = wdir - yaw
 
-        Vax = U * (
-            (1 - np.expand_dims(an, axis=-1))
-            * np.cos(local_yaw * np.cos(geom.theta_mesh))
-            * np.cos(local_yaw * np.sin(geom.theta_mesh))
+        Vax = U * ((1 - an) * np.cos(local_yaw * np.cos(geom.theta_mesh)) * np.cos(local_yaw * np.sin(geom.theta_mesh)))
+        Vtan = (1 + aprime) * tsr * geom.mu_mesh - U * (1 - an) * np.cos(local_yaw * np.sin(geom.theta_mesh)) * np.sin(
+            local_yaw * np.cos(geom.theta_mesh)
         )
-        Vtan = (1 + np.expand_dims(aprime, axis=-1)) * tsr * geom.mu_mesh - U * (
-            1 - np.expand_dims(an, axis=-1)
-        ) * np.cos(local_yaw * np.sin(geom.theta_mesh)) * np.sin(local_yaw * np.cos(geom.theta_mesh))
 
         phi = np.arctan2(Vax, Vtan)
         aoa = phi - rotor.twist(geom.mu_mesh) - pitch
@@ -177,7 +173,7 @@ class KraghAerodynamics(AerodynamicModel):
 
         Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
 
-        solidity = rotor.solidity(geom.mu)
+        solidity = rotor.solidity(geom.mu_mesh)
 
         aero_props = AerodynamicProperties(
             an, aprime, solidity, U * np.ones(geom.shape), wdir * np.ones(geom.shape), Vax, Vtan, aoa, Cl, Cd
@@ -221,8 +217,8 @@ class DefaultAerodynamics(AerodynamicModel):
         """
         local_yaw = -yaw
 
-        Vax = U * ((1 - np.expand_dims(an, axis=-1)) * np.cos(local_yaw))
-        Vtan = (1 + np.expand_dims(aprime, axis=-1)) * tsr * geom.mu_mesh - U * np.cos(geom.theta_mesh) * np.sin(
+        Vax = U * ((1 - an) * np.cos(local_yaw))
+        Vtan = (1 + aprime) * tsr * geom.mu_mesh - U * np.cos(geom.theta_mesh) * np.sin(
             local_yaw
         )
 
@@ -232,7 +228,7 @@ class DefaultAerodynamics(AerodynamicModel):
 
         Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
 
-        solidity = rotor.solidity(geom.mu)
+        solidity = rotor.solidity(geom.mu_mesh)
 
         aero_props = AerodynamicProperties(
             an, aprime, solidity, U * np.ones(geom.shape), wdir * np.ones(geom.shape), Vax, Vtan, aoa, Cl, Cd

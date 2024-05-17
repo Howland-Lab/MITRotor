@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 import numpy as np
 from numpy.typing import ArrayLike
 
@@ -59,7 +59,7 @@ class ConstantInduction(MomentumModel):
 
 class ClassicalMomentum(MomentumModel):
     def Ct_a(self, Ct, yaw, tiploss=1.0):
-        return 0.5 * (1 + np.sqrt(1 - Ct / tiploss))
+        return 0.5 * (1 - np.sqrt(1 - Ct / tiploss))
 
     def __call__(
         self,
@@ -77,11 +77,36 @@ class ClassicalMomentum(MomentumModel):
 
 
 class HeckMomentum(MomentumModel):
-    def __init__(self, v4_correction: float = 1.0):
+    def __init__(
+        self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", ac: float = 1 / 3, v4_correction: float = 1.0
+    ):
         self.v4_correction = v4_correction
+        self.ac = ac
+        if averaging == "rotor":
+            self._func = self._func_rotor
+        elif averaging == "annulus":
+            self._func = self._func_annulus
+        elif averaging == "sector":
+            self._func = self._func_sector
+        else:
+            raise ValueError(f"Averaging method {averaging} not found for HeckMomentum model.")
+        self.averaging = averaging
 
     def Ct_a(self, Ct: ArrayLike, yaw: float) -> ArrayLike:
-        raise NotImplementedError
+        Ctc = 4 * self.ac * (1 - self.ac) / (1 + 0.25 * (1 - self.ac) ** 2 * np.sin(yaw) ** 2)
+        slope = (16 * (1 - self.ac) ** 2 * np.sin(yaw) ** 2 - 128 * self.ac + 64) / (
+            (1 - self.ac) ** 2 * np.sin(yaw) ** 2 + 4
+        ) ** 2
+
+        a_target = (2 * Ct - 4 + np.sqrt(-(Ct**2) * np.sin(yaw) ** 2 - 16 * Ct + 16)) / (
+            -4 + np.sqrt(-(Ct**2) * np.sin(yaw) ** 2 - 16 * Ct + 16)
+        )
+
+        if np.iterable(Ct):
+            mask = Ct > Ctc
+            a_target[mask] = (Ct[mask] - Ctc) / slope + self.ac
+
+        return a_target
 
     def __call__(
         self,
@@ -92,32 +117,72 @@ class HeckMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        ac = 1 / 3
+        an = self._func(aero_props, pitch, tsr, yaw, rotor, geom)
+        return an
 
-        Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
+    def _func_rotor(
+        self,
+        aero_props: "AerodynamicProperties",
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: "RotorDefinition",
+        geom: "BEMGeometry",
+    ) -> ArrayLike:
+        Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
+        Ct_rotor = geom.rotor_average(geom.annulus_average(Ct))
 
-        Ct_rotor = geom.rotor_average(Ct)
-
-        Ctc = 4 * ac * (1 - ac) / (1 + 0.25 * (1 - ac) ** 2 * np.sin(yaw) ** 2)
-        slope = (16 * (1 - ac) ** 2 * np.sin(yaw) ** 2 - 128 * ac + 64) / ((1 - ac) ** 2 * np.sin(yaw) ** 2 + 4) ** 2
-
-        if Ct_rotor > Ctc:
-            a_target = (Ct_rotor - Ctc) / slope + ac
-        else:
-            a_target = (2 * Ct_rotor - 4 + np.sqrt(-(Ct_rotor**2) * np.sin(yaw) ** 2 - 16 * Ct_rotor + 16)) / (
-                -4 + np.sqrt(-(Ct_rotor**2) * np.sin(yaw) ** 2 - 16 * Ct_rotor + 16)
-            )
+        a_target = self.Ct_a(Ct_rotor, yaw)
 
         a_new = aero_props.F
-        a_rotor = geom.rotor_average(a_new)
+        a_rotor = geom.rotor_average(geom.annulus_average(a_new))
         a_new *= a_target / a_rotor
 
         return a_new
 
+    def _func_annulus(
+        self,
+        aero_props: "AerodynamicProperties",
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: "RotorDefinition",
+        geom: "BEMGeometry",
+    ) -> ArrayLike:
+        Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
+        _Ct = np.clip(Ct, -1, 1.59)
+        a = self.Ct_a(_Ct, yaw)[:, None] * np.ones(geom.shape)
+
+        return a
+
+    def _func_sector(
+        self,
+        aero_props: "AerodynamicProperties",
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: "RotorDefinition",
+        geom: "BEMGeometry",
+    ) -> ArrayLike:
+        Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
+        ans = self.Ct_a(Ct.ravel(), yaw)
+        return ans.reshape(geom.shape)
+
 
 class UnifiedMomentum(MomentumModel):
-    def __init__(self, beta=0.1403):
+    def __init__(self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", beta=0.1403):
         self.beta = beta
+
+        if averaging == "rotor":
+            self._func = self._func_rotor
+        elif averaging == "annulus":
+            self._func = self._func_annulus
+        elif averaging == "sector":
+            self._func = self._func_sector
+        else:
+            raise ValueError(f"Averaging method {averaging} not found for UnifiedMomentum model.")
+        self.averaging = averaging
+
         self.model_Ctprime = UMM.UnifiedMomentum(beta=beta)
         self.model_Ct = UMM.ThrustBasedUnified(beta=beta)
 
@@ -125,6 +190,54 @@ class UnifiedMomentum(MomentumModel):
         sol = self.model_Ct(Ct, yaw)
         return sol.an
 
+    def _func_rotor(
+        self,
+        aero_props: "AerodynamicProperties",
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: "RotorDefinition",
+        geom: "BEMGeometry",
+    ) -> ArrayLike:
+        Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
+
+        Ct_rotor = geom.rotor_average(Ct)
+        sol = self.model_Ct(Ct_rotor, yaw)
+        a_target = sol.an
+
+        a_new = aero_props.F
+        a_rotor = geom.rotor_average(geom.annulus_average(a_new))
+        a_new *= a_target / a_rotor
+
+        return a_new
+
+    def _func_annulus(
+        self,
+        aero_props: "AerodynamicProperties",
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: "RotorDefinition",
+        geom: "BEMGeometry",
+    ) -> ArrayLike:
+        Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
+        _Ct = np.clip(Ct, -1, 1.59)
+        an = self.Ct_a(_Ct, yaw)[:, None] * np.ones(geom.shape)
+        return an
+
+    def _func_sector(
+        self,
+        aero_props: "AerodynamicProperties",
+        pitch: float,
+        tsr: float,
+        yaw: float,
+        rotor: "RotorDefinition",
+        geom: "BEMGeometry",
+    ) -> ArrayLike:
+        Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
+        an = self.Ct_a(Ct.ravel(), yaw).reshape(geom.shape)
+        return an
+
     def __call__(
         self,
         aero_props: "AerodynamicProperties",
@@ -134,12 +247,8 @@ class UnifiedMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
-        return self.Ct_a(Ct, yaw)
-        # Ctprime = Ct / ((1 - aero_props.an) ** 2 * np.cos(yaw) ** 2)
-        # momentum_sol = self.model_Ctprime(Ctprime / np.maximum(aero_props.F, 0.01), yaw)
-
-        # return momentum_sol.an
+        an = self._func(aero_props, pitch, tsr, yaw, rotor, geom)
+        return an
 
 
 class MadsenMomentum(MomentumModel):
@@ -162,249 +271,6 @@ class MadsenMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
+        Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
         an = self.Ct_a(Ct, yaw, tiploss=aero_props.F)
         return an
-
-
-# def calc_an(
-#     aero_props: "AerodynamicProperties", pitch: float, tsr: float, yaw: float, rotor: "RotorDefinition", geom: "BEMGeometry"
-# ) -> ArrayLike:
-#     ac = 1 / 3
-
-#     Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
-
-#     Ct_rotor = geom.rotor_average(Ct)
-
-#     Ctc = 4 * ac * (1 - ac) / (1 + 0.25 * (1 - ac) ** 2 * np.sin(yaw) ** 2)
-#     slope = (16 * (1 - ac) ** 2 * np.sin(yaw) ** 2 - 128 * ac + 64) / ((1 - ac) ** 2 * np.sin(yaw) ** 2 + 4) ** 2
-
-#     if Ct_rotor > Ctc:
-#         a_target = (Ct_rotor - Ctc) / slope + ac
-#     else:
-#         a_target = (2 * Ct_rotor - 4 + np.sqrt(-(Ct_rotor**2) * np.sin(yaw) ** 2 - 16 * Ct_rotor + 16)) / (
-#             -4 + np.sqrt(-(Ct_rotor**2) * np.sin(yaw) ** 2 - 16 * Ct_rotor + 16)
-#         )
-
-#     a_new = aero_props.F
-#     a_rotor = geom.rotor_average(a_new)
-#     a_new *= a_target / a_rotor
-
-#     return a_new
-
-
-# class Madsen(MomentumModel):
-#     def Ct_a(self, Ct, yaw, tiploss=1):
-#         yaw = np.abs(yaw)
-#         k3 = -0.6481 * yaw**3 + 2.1667 * yaw**2 - 2.0705 * yaw
-#         k2 = 0.8646 * yaw**3 - 2.6145 * yaw**2 + 2.1735 * yaw
-#         k1 = -0.1640 * yaw**3 + 0.4438 * yaw**2 - 0.5136 * yaw
-#         CT_lim = np.clip(Ct, 0.0, 0.9)
-
-#         Ka = k3 * np.abs(CT_lim) ** 3 + k2 * CT_lim**2 + k1 * np.abs(CT_lim) + 1.0
-
-#         Ct_tiploss = np.clip(Ct / tiploss, 0.0, 2.0)
-#         a = Ct_tiploss**3 * 0.0883 + Ct_tiploss**2 * 0.0586 + Ct_tiploss * 0.2460
-
-#         a_corrected = a * Ka
-#         return np.clip(a_corrected, 0.0, 2.0)
-
-#     def __call__(
-#         self,
-#         aero_props: "AerodynamicProperties",
-#         pitch: float,
-#         tsr: float,
-#         yaw: float,
-#         rotor: "RotorDefinition",
-#         geom: "BEMGeometry",
-#     ) -> ArrayLike:
-#         Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
-#         a = self.Ct_a(Ct, yaw, tiploss=aero_props.F)
-#         a[geom.mu < 0.05] = 0.0
-#         a[geom.mu > 0.99] = 0.0
-#         # sol._Ctan[geom.mu > 0.99] = 0.0
-
-#         return a
-
-
-# class RotorAveragedHeck(MomentumModel):
-#     def Ct_a(self, Ct: ArrayLike, yaw: float) -> ArrayLike:
-#         raise NotImplementedError
-
-#     def __call__(
-#         self,
-#         aero_props: "AerodynamicProperties",
-#         pitch: float,
-#         tsr: float,
-#         yaw: float,
-#         rotor: "RotorDefinition",
-#         geom: "BEMGeometry",
-#     ) -> ArrayLike:
-#         ac = 1 / 3
-
-#         Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
-
-#         Ct_rotor = geom.rotor_average(Ct)
-
-#         Ctc = 4 * ac * (1 - ac) / (1 + 0.25 * (1 - ac) ** 2 * np.sin(yaw) ** 2)
-#         slope = (16 * (1 - ac) ** 2 * np.sin(yaw) ** 2 - 128 * ac + 64) / ((1 - ac) ** 2 * np.sin(yaw) ** 2 + 4) ** 2
-
-#         if Ct_rotor > Ctc:
-#             a_target = (Ct_rotor - Ctc) / slope + ac
-#         else:
-#             a_target = (2 * Ct_rotor - 4 + np.sqrt(-(Ct_rotor**2) * np.sin(yaw) ** 2 - 16 * Ct_rotor + 16)) / (
-#                 -4 + np.sqrt(-(Ct_rotor**2) * np.sin(yaw) ** 2 - 16 * Ct_rotor + 16)
-#             )
-
-#         a_new = aero_props.F
-#         a_rotor = geom.rotor_average(a_new)
-#         a_new *= a_target / a_rotor
-
-#         return a_new
-
-
-# class RotorAveragedUnified(MomentumModel):
-#     def __init__(self, beta=0.1403):
-#         self.beta = beta
-#         self.model_Ctprime = UMM.UnifiedMomentum(beta=beta)
-#         self.model_Ct = UMM.ThrustBasedUnified(beta=beta)
-
-#     def Ct_a(self, Ct: ArrayLike, yaw: float) -> ArrayLike:
-#         sol = self.model_Ct(Ct, yaw)
-#         return sol.an
-
-#     def __call__(
-#         self,
-#         aero_props: "AerodynamicProperties",
-#         pitch: float,
-#         tsr: float,
-#         yaw: float,
-#         rotor: "RotorDefinition",
-#         geom: "BEMGeometry",
-#     ) -> ArrayLike:
-#         Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
-
-#         Ct_rotor = geom.rotor_average(Ct)
-#         sol = self.model_Ct(Ct_rotor, yaw)
-#         a_target = sol.an
-
-#         a_new = aero_props.F
-#         a_rotor = geom.rotor_average(a_new)
-#         a_new *= a_target / a_rotor
-
-#         return a_new
-
-
-# class Lu(MomentumModel):
-#     def __init__(self, v4_correction=1.5):
-#         self.model_Ctprime = UMM.Heck(v4_correction=v4_correction)
-
-#     def Ct_a(self, Ct: ArrayLike, yaw: float) -> ArrayLike:
-#         ...
-
-#     def __call__(
-#         self,
-#         aero_props: "AerodynamicProperties",
-#         pitch: float,
-#         tsr: float,
-#         yaw: float,
-#         rotor: "RotorDefinition",
-#         geom: "BEMGeometry",
-#     ) -> ArrayLike:
-#         Ctprime = aero_props.solidity * geom.annulus_average(1 / np.sin(aero_props.phi) ** 2 * aero_props.Cax)
-#         sol = self.model_Ctprime(np.minimum(Ctprime / aero_props.F, 4.0), yaw)
-#         return sol.an
-
-
-# class CTaRotorAveragedUnifiedMomentum:
-#     def __init__(self, beta=0.1403):
-#         self.beta = beta
-#         self.model_Ctprime = UnifiedMomentum(beta=beta)
-#         self.model_Ct = ThrustBasedUnified(beta=beta)
-
-#     def Ct_a(self, Ct: ArrayLike, yaw: float) -> ArrayLike:
-#         sol = self.model_Ct(Ct, yaw)
-#         # print(f"if Ct={Ct}, a={sol.an} ({sol.converged})")
-#         return sol.an
-
-#     def __call__(self, sol: "BEMSolution") -> "BEMSolution":
-#         x0 = np.vstack([sol._a, sol._u4, sol._v4, sol._dp])
-
-#         Ct_rotor = sol.Ct()
-#         # Ct_rotor = rotor_average(sol.mu, sol._Ct)
-#         # print(f"{Ct_rotor=}")
-#         a_target = self.Ct_a(Ct_rotor, sol.yaw)
-
-#         # This is without tiploss (constant induction)
-#         # a_new = np.ones_like(sol._tiploss)
-#         # a_rotor = 1
-
-#         # This is with tiploss
-#         a_new = sol._tiploss
-#         a_rotor = sol.tiploss()
-
-#         a_new *= a_target / a_rotor
-
-#         sol._a = a_new
-#         # print(f"{sol.Ct()=}")
-#         # what about u4, v4 and dp?
-#         # print(sol.a())
-#         # breakpoint()
-#         return sol
-
-
-# TODO
-# class Mike:
-#     def __call__(self, bem_obj):
-#         Ct = bem_obj._W**2 * bem_obj.solidity * bem_obj._Cax
-
-#         Ct_rotor = aggregate(bem_obj.mu, bem_obj.theta_mesh, Ct, agg="rotor")
-
-#         a_target = (
-#             2 * Ct_rotor
-#             - 4
-#             + np.sqrt(-(Ct_rotor**2) * np.sin(bem_obj.yaw) ** 2 - 16 * Ct_rotor + 16)
-#         ) / (
-#             -4
-#             + np.sqrt(-(Ct_rotor**2) * np.sin(bem_obj.yaw) ** 2 - 16 * Ct_rotor + 16)
-#         )
-
-#         a_new = bem_obj._tiploss
-#         a_rotor = aggregate(bem_obj.mu, bem_obj.theta_mesh, a_new, agg="rotor")
-#         a_new *= a_target / a_rotor
-
-#         return a_new
-
-
-# class MikeCorrected:
-#     def __call__(self, bem_obj, ac=1 / 3):
-#         Ct = bem_obj._W**2 * bem_obj.solidity * bem_obj._Cax
-
-#         Ct_rotor = aggregate(bem_obj.mu, bem_obj.theta_mesh, Ct, agg="rotor")
-
-#         Ctc = 4 * ac * (1 - ac) / (1 + 0.25 * (1 - ac) ** 2 * np.sin(bem_obj.yaw) ** 2)
-#         slope = (16 * (1 - ac) ** 2 * np.sin(bem_obj.yaw) ** 2 - 128 * ac + 64) / (
-#             (1 - ac) ** 2 * np.sin(bem_obj.yaw) ** 2 + 4
-#         ) ** 2
-
-#         if Ct_rotor > Ctc:
-#             a_target = (Ct_rotor - Ctc) / slope + ac
-#         else:
-#             a_target = (
-#                 2 * Ct_rotor
-#                 - 4
-#                 + np.sqrt(
-#                     -(Ct_rotor**2) * np.sin(bem_obj.yaw) ** 2 - 16 * Ct_rotor + 16
-#                 )
-#             ) / (
-#                 -4
-#                 + np.sqrt(
-#                     -(Ct_rotor**2) * np.sin(bem_obj.yaw) ** 2 - 16 * Ct_rotor + 16
-#                 )
-#             )
-
-#         a_new = bem_obj._tiploss
-#         a_rotor = aggregate(bem_obj.mu, bem_obj.theta_mesh, a_new, agg="rotor")
-#         a_new *= a_target / a_rotor
-
-#         return a_new
