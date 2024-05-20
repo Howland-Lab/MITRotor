@@ -104,7 +104,8 @@ class HeckMomentum(MomentumModel):
 
         if np.iterable(Ct):
             mask = Ct > Ctc
-            a_target[mask] = (Ct[mask] - Ctc) / slope + self.ac
+            if np.any(mask):
+                a_target[mask] = (Ct[mask] - Ctc) / slope + self.ac
 
         return a_target
 
