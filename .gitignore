@@ -7,6 +7,11 @@ fig*
 *.mat
 *.npz
 *.csv
+*old
+*.backup
+*.pkl
+*.png
+*.tar
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

@@ -2,9 +2,13 @@ from pathlib import Path
 import yaml
 from .RotorDefinition import RotorDefinition
 
-fn_IEA15MW = Path(__file__).parent / "IEA-15-240-RWT.yaml"
-fn_IEA10MW = Path(__file__).parent / "IEA-10-198-RWT.yaml"
-fn_IEA3_4MW = Path(__file__).parent / "IEA-3.4-130-RWT.yaml"
+turbine_model_dir = Path(__file__).parent / "ReferenceTurbines"
+fn_IEA15MW = turbine_model_dir / "IEA-15-240-RWT.yaml"
+fn_IEA10MW = turbine_model_dir / "IEA-10-198-RWT.yaml"
+fn_IEA3_4MW = turbine_model_dir / "IEA-3.4-130-RWT.yaml"
+
+
+__all__ = ["IEA15MW", "IEA10MW", "IEA3_4MW"]
 
 
 def IEA15MW() -> RotorDefinition:

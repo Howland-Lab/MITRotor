@@ -2,13 +2,15 @@ from typing import Tuple
 from numpy.typing import ArrayLike
 import numpy as np
 
+__all__ = ["BEMGeometry"]
+
 
 class BEMGeometry:
     def __init__(self, Nr, Ntheta):
         self.Nr = Nr
         self.Ntheta = Ntheta
 
-        self.mu = np.linspace(0.0, 0.999, Nr)
+        self.mu = np.linspace(0.0, 0.99999, Nr)
         self.theta = np.linspace(0.0, 2 * np.pi, Ntheta)
 
         self.theta_mesh, self.mu_mesh = np.meshgrid(self.theta, self.mu)
