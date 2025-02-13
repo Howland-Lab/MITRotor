@@ -130,16 +130,19 @@ class HeckMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
+
+        # Compute the thrust coefficient
         Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
-        Ct_rotor = geom.rotor_average(geom.annulus_average(Ct))
+        # Average the thrust coefficient over the rotor
+        Ct_bar = geom.rotor_average(geom.annulus_average(Ct))
+        # Compute the average axial induction factor
+        a_bar = self.Ct_a(Ct_bar, yaw)
+        # Compute the average tip loss factor
+        f_bar = geom.rotor_average(geom.annulus_average(aero_props.F))
+        # Compute the corrected average axial induction factor
+        a_corr = np.ones_like(geom.mu_mesh) * (a_bar / f_bar)
 
-        a_target = self.Ct_a(Ct_rotor, yaw)
-
-        a_new = aero_props.F
-        a_rotor = geom.rotor_average(geom.annulus_average(a_new))
-        a_new *= a_target / a_rotor
-
-        return a_new
+        return a_corr
 
     def _func_annulus(
         self,
@@ -150,9 +153,11 @@ class HeckMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
+        
+        # Compute the annulus averaged thrust coefficient
         Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
-        _Ct = np.clip(Ct, -1, 1.59)
-        a = self.Ct_a(_Ct, yaw)[:, None] * np.ones(geom.shape)
+        # Compute the annulus averaged axial induction factor and apply the tip loss correction
+        a = self.Ct_a(Ct, yaw)[:, None] * np.ones(geom.shape) / aero_props.F
 
         return a
 
@@ -165,9 +170,12 @@ class HeckMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
+
+        # Compute the thrust coefficient
         Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
-        ans = self.Ct_a(Ct.ravel(), yaw)
-        return ans.reshape(geom.shape)
+        # Compute the axial induction factor and apply the tip loss correction
+        a = self.Ct_a(Ct.ravel(), yaw)
+        return a.reshape(geom.shape) / aero_props.F
 
 
 class UnifiedMomentum(MomentumModel):
@@ -200,17 +208,19 @@ class UnifiedMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
 
-        Ct_rotor = geom.rotor_average(Ct)
-        sol = self.model_Ct(Ct_rotor, yaw)
-        a_target = sol.an
+        # Compute the thrust coefficient
+        Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
+        # Average the thrust coefficient over the rotor
+        Ct_bar = geom.rotor_average(geom.annulus_average(Ct))
+        # Compute the average axial induction factor
+        a_bar = self.Ct_a(Ct_bar, yaw)
+        # Compute the average tip loss factor
+        f_bar = geom.rotor_average(geom.annulus_average(aero_props.F))
+        # Compute the corrected average axial induction factor
+        a_corr = np.ones_like(geom.mu_mesh) * (a_bar / f_bar)
 
-        a_new = aero_props.F
-        a_rotor = geom.rotor_average(geom.annulus_average(a_new))
-        a_new *= a_target / a_rotor
-
-        return a_new
+        return a_corr
 
     def _func_annulus(
         self,
@@ -221,10 +231,13 @@ class UnifiedMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
+        
+        # Compute the annulus averaged thrust coefficient
         Ct = geom.annulus_average(aero_props.solidity * aero_props.W**2 * aero_props.Cax)
-        _Ct = np.clip(Ct, -1, 1.59)
-        an = self.Ct_a(_Ct, yaw)[:, None] * np.ones(geom.shape)
-        return an
+        # Compute the annulus averaged axial induction factor and apply the tip loss correction
+        a = self.Ct_a(Ct, yaw)[:, None] * np.ones(geom.shape) / aero_props.F
+
+        return a
 
     def _func_sector(
         self,
@@ -235,9 +248,13 @@ class UnifiedMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
+        
+        # Compute the thrust coefficient
         Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
-        an = self.Ct_a(Ct.ravel(), yaw).reshape(geom.shape)
-        return an
+        # Compute the axial induction factor
+        a = self.Ct_a(Ct.ravel(), yaw)
+        # Apply the tip loss correction and return the axial induction factor
+        return a.reshape(geom.shape) / aero_props.F
 
     def __call__(
         self,
