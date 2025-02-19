@@ -70,7 +70,7 @@ class ClassicalMomentum(MomentumModel):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        Ct = aero_props.solidity * geom.annulus_average(aero_props.W**2 * aero_props.Cax)
+        Ct = aero_props.solidity * aero_props.W**2 * aero_props.Cax
         a = self.Ct_a(Ct, yaw, tiploss=aero_props.F)
 
         return a
