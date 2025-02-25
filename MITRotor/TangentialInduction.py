@@ -50,12 +50,11 @@ class DefaultTangentialInduction(TangentialInductionModel):
         rotor: RotorDefinition,
         geom: BEMGeometry,
     ) -> ArrayLike:
-        tangential_integral = aero_props.W**2 * aero_props.Ctan
+        
 
         aprime = (
-            aero_props.solidity
+            aero_props.C_tau_corr
             / (4 * np.maximum(geom.mu_mesh, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(yaw))
-            * tangential_integral
         )
 
         return aprime
