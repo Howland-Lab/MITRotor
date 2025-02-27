@@ -72,8 +72,7 @@ class MomentumModel(ABC):
         annulus_avg_axial_force = (
             
                 geom.annulus_average(
-                    # aero_props.C_x_corr
-                    np.clip(aero_props.C_x_corr, 0, 1.69)
+                    aero_props.C_x_corr
                     )
                     )[:, None] * np.ones(geom.shape)
         
