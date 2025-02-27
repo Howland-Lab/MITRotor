@@ -38,8 +38,9 @@ class NoTipLoss(TipLossModel):
 
 
 class PrandtlTipLoss(TipLossModel):
-    def __init__(self, root_loss: bool = True):
+    def __init__(self, root_loss: bool = True, min_val: float = 0.00001):
         self.root_loss = root_loss
+        self.min_val = min_val
 
     def __call__(
         self,
@@ -66,7 +67,9 @@ class PrandtlTipLoss(TipLossModel):
             )
             F_hub = 2 / np.pi * np.arccos(np.clip(np.exp(-np.clip(f_hub, -100, 100)), -0.9999, 0.9999))
 
-            return np.maximum(F_hub * F_tip, 0.00001)
+            return np.maximum(F_hub * F_tip, self.min_val)
 
         else:
-            return np.maximum(F_tip, 0.00001)
+            return np.maximum(F_tip, self.min_val)
+        
+
