@@ -105,16 +105,8 @@ class BEMSolution:
 
     def v4(self):
         return self._v4
-
-    def Cp(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        dCp = (
-            self.tsr
-            * self.geom.mu_mesh
-            * self.Ctau(grid="sector")
-        )
-        return average(self.geom, dCp, grid=grid)
     
-    def Cp_uncorr(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
+    def Cp(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         dCp = (
             self.tsr
             * self.geom.mu_mesh
@@ -122,12 +114,8 @@ class BEMSolution:
         )
         return average(self.geom, dCp, grid=grid)
     
-    def Ct_uncorr(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        _Ct = self.aero_props.C_x
-        return average(self.geom, _Ct, grid=grid)
-
     def Ct(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        _Ct = self.aero_props.C_x_corr
+        _Ct = self.aero_props.C_x
         return average(self.geom, _Ct, grid=grid)
 
     def Ctprime(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -135,9 +123,7 @@ class BEMSolution:
         return average(self.geom, Ctprime, grid=grid)
 
 
-
-# @adaptivefixedpointiteration(max_iter=500, relaxations=[0.25, 0.5, 0.96])
-@adaptivefixedpointiteration(max_iter=500, relaxations=[0.99])
+@adaptivefixedpointiteration(max_iter=500, relaxations=[0.25, 0.5, 0.96])
 class BEM:
     """
     A generic BEM class which facilitates dependency injection for various models.
@@ -179,7 +165,7 @@ class BEM:
     def initial_guess(
         self, pitch: float, tsr: float, yaw: float = 0.0, U: ArrayLike = 1.0, wdir: ArrayLike = 0.0
     ) -> Tuple[ArrayLike, ...]:
-        a = 1 / 3 * np.ones(self.geometry.shape)
+        a = (1 / 3) * np.ones(self.geometry.shape)
         aprime = np.zeros(self.geometry.shape)
 
         return a, aprime

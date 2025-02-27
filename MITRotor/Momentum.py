@@ -102,7 +102,7 @@ class MomentumModel(ABC):
         geom: "BEMGeometry",
     ) -> ArrayLike:
         an = self._func(aero_props, pitch, tsr, yaw, rotor, geom)
-        return an
+        return np.clip(an, 0, 1)
 
 
 class ConstantInduction(MomentumModel):
