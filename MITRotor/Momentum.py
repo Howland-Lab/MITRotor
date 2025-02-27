@@ -50,7 +50,7 @@ class MomentumModel(ABC):
         rotor_avg_axial_force = (
             geom.rotor_average(
                 geom.annulus_average(
-                    aero_props.C_x_corr
+                    np.clip(aero_props.C_x_corr, 0, 1.69)
                     )
                     )
         )
@@ -72,7 +72,8 @@ class MomentumModel(ABC):
         annulus_avg_axial_force = (
             
                 geom.annulus_average(
-                    aero_props.C_x_corr
+                    # aero_props.C_x_corr
+                    np.clip(aero_props.C_x_corr, 0, 1.69)
                     )
                     )[:, None] * np.ones(geom.shape)
         
@@ -171,7 +172,8 @@ class UnifiedMomentum(MomentumModel):
         self.model_Ct = UMM.ThrustBasedUnified(beta=beta)
 
     def compute_induction(self, Cx: ArrayLike, yaw: float) -> ArrayLike:
-        return self.model_Ct(Cx, yaw).a
+        sol = self.model_Ct(Cx, yaw)
+        return sol.an
 
 
 class MadsenMomentum(MomentumModel):

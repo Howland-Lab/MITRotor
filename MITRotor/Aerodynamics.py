@@ -214,14 +214,6 @@ class DefaultAerodynamics(AerodynamicModel):
 
         solidity = rotor.solidity(geom.mu_mesh)
 
-        # F = tiploss_model(
-        #     pitch = pitch,
-        #     tsr = tsr,
-        #     yaw = yaw,
-        #     rotor = rotor,
-        #     geometry = geom
-        # )
-
         aero_props = AerodynamicProperties(
             an = an, 
             aprime = aprime, 
@@ -233,7 +225,6 @@ class DefaultAerodynamics(AerodynamicModel):
             aoa = aoa, 
             Cl = Cl, 
             Cd = Cd,
-            # F = F
         )
 
         return aero_props
