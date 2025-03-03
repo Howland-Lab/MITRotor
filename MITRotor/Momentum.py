@@ -125,7 +125,7 @@ class ClassicalMomentum(MomentumModel):
         else:
             raise ValueError(f"Averaging method {averaging} not found for ClassicalMomentum model.")
         self.averaging = averaging
-        
+
     def compute_induction(self, Cx, yaw):
         return 0.5 * (1 - np.sqrt(1 - Cx))
 
@@ -190,7 +190,9 @@ class MadsenMomentum(MomentumModel):
     """
     Madsen momentum model based on Madsen 2020 in Wind Energy Science.
     """
-    def __init__(self, averaging: Literal["sector", "annulus", "rotor"] = "rotor"):
+    def __init__(self, 
+                 averaging: Literal["sector", "annulus", "rotor"] = "rotor",
+                 cosine_exponent: bool = False):
         if averaging == "rotor":
             self._func = self._func_rotor
         elif averaging == "annulus":
@@ -200,8 +202,14 @@ class MadsenMomentum(MomentumModel):
         else:
             raise ValueError(f"Averaging method {averaging} not found for UnifiedMomentum model.")
         self.averaging = averaging
+        self.cosine_exponent = cosine_exponent
 
 
     def compute_induction(self, Cx: ArrayLike, yaw: float) -> ArrayLike:
+        if self.cosine_exponent:
+            Ct = Cx / np.cos(yaw)**2
+        else:
+            Ct = Cx
+
         an = Cx**3 * 0.0883 + Cx**2 * 0.0586 + Cx * 0.2460
         return an
