@@ -207,9 +207,9 @@ class MadsenMomentum(MomentumModel):
 
     def compute_induction(self, Cx: ArrayLike, yaw: float) -> ArrayLike:
         if self.cosine_exponent:
-            Ct = Cx * np.cos(yaw)**2
+            Ct = Cx / (np.cos(yaw)**2)
         else:
             Ct = Cx
 
-        an = Cx**3 * 0.0883 + Cx**2 * 0.0586 + Cx * 0.2460
+        an = Ct**3 * 0.0883 + Ct**2 * 0.0586 + Ct * 0.2460
         return an
