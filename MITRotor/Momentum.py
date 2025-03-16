@@ -79,7 +79,7 @@ class ClassicalMomentum(MomentumModel):
 class HeckMomentum(MomentumModel):
     def __init__(
         self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", ac: float = 1 / 3, v4_correction: float = 1.0
-    ):
+    ):  #TODO: the v4_correction isn't used. Should it be mentioned in the quickstart? Removed? Is ac the starting induction guess?
         self.v4_correction = v4_correction
         self.ac = ac
         if averaging == "rotor":
