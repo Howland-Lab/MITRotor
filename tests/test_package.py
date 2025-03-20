@@ -2,7 +2,7 @@ def test_geomoetry_imports():
     from MITRotor import BEMGeometry
 
 def test_aerodynamic_model_imports():
-    from MITRotor import AerodynamicModel, DefaultAerodynamics, KraghAerodynamics, AerodynamicProperties
+    from MITRotor import AerodynamicModel, DefaultAerodynamics, AerodynamicProperties
 
 
 def test_tangential_induction_model_imports():
