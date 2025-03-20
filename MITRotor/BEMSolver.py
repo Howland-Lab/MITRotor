@@ -192,8 +192,8 @@ class BEM:
         wdir: ArrayLike = None,
     ) -> Tuple[ArrayLike, ...]:
         an, aprime = x
-        U = U or np.ones(self.geometry.shape)
-        wdir = wdir or np.zeros(self.geometry.shape)
+        U = np.ones(self.geometry.shape) if U is None else U
+        wdir = np.zeros(self.geometry.shape) if wdir is None else wdir
 
         aero_props = self.aerodynamic_model(
             an = an, 
