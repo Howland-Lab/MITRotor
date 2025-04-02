@@ -145,7 +145,7 @@ class KraghAerodynamics(AerodynamicModel):
         method outlined in Howland et al. 2020. (Influence of atmospheric conditions
         on the power production of utility-scale wind turbines in yaw misalignment)
 
-        TODO: differentiate comments from the default option below
+        Depends on 2013 paper by Kragh and Hansen: https://doi.org/10.1002/we.1612
 
         Args:
             an (ArrayLike): Axial induction radial profile.

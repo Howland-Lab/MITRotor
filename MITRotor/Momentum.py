@@ -77,9 +77,13 @@ class ClassicalMomentum(MomentumModel):
 
 
 class HeckMomentum(MomentumModel):
+    """
+    Heck Momentum model based on 2023 paper:
+    https://doi.org/10.1017/jfm.2023.129 
+    """
     def __init__(
         self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", ac: float = 1 / 3, v4_correction: float = 1.0
-    ):  #TODO: the v4_correction isn't used. Should it be mentioned in the quickstart? Removed? Is ac the starting induction guess?
+    ):
         self.v4_correction = v4_correction
         self.ac = ac
         if averaging == "rotor":
@@ -171,6 +175,10 @@ class HeckMomentum(MomentumModel):
 
 
 class UnifiedMomentum(MomentumModel):
+    """
+    Unified Momentum Model based on 2024 paper:
+    https://www.nature.com/articles/s41467-024-50756-5 
+    """
     def __init__(self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", beta=0.1403):
         self.beta = beta
 
@@ -253,6 +261,10 @@ class UnifiedMomentum(MomentumModel):
 
 
 class MadsenMomentum(MomentumModel):
+    """
+    Madsen Momentum model based on 2020 paper:
+    https://wes.copernicus.org/articles/5/1/2020/
+    """
     def __init__(self, cosine_exponent=None):
         self.cosine_exponent = cosine_exponent
 
