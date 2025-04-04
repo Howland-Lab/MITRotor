@@ -132,6 +132,10 @@ class ClassicalMomentum(MomentumModel):
 
 
 class HeckMomentum(MomentumModel):
+    """
+    Heck Momentum model based on 2023 paper:
+    https://doi.org/10.1017/jfm.2023.129 
+    """
     def __init__(
         self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", ac: float = 1 / 3, v4_correction: float = 1.0
     ):
@@ -166,6 +170,10 @@ class HeckMomentum(MomentumModel):
 
 
 class UnifiedMomentum(MomentumModel):
+    """
+    Unified Momentum Model based on 2024 paper:
+    https://www.nature.com/articles/s41467-024-50756-5 
+    """
     def __init__(self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", beta=0.1403):
         self.beta = beta
 
@@ -188,7 +196,8 @@ class UnifiedMomentum(MomentumModel):
 
 class MadsenMomentum(MomentumModel):
     """
-    Madsen momentum model based on Madsen 2020 in Wind Energy Science.
+    Madsen Momentum model based on 2020 paper:
+    https://wes.copernicus.org/articles/5/1/2020/
     """
     def __init__(self, 
                  averaging: Literal["sector", "annulus", "rotor"] = "rotor",
@@ -200,7 +209,7 @@ class MadsenMomentum(MomentumModel):
         elif averaging == "sector":
             self._func = self._func_sector
         else:
-            raise ValueError(f"Averaging method {averaging} not found for UnifiedMomentum model.")
+            raise ValueError(f"Averaging method {averaging} not found for MadsenMomentum model.")
         self.averaging = averaging
         self.cosine_exponent = cosine_exponent
 
