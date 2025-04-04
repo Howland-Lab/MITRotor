@@ -35,7 +35,7 @@ class AerodynamicProperties:
         aoa (ArrayLike): Blade element angle of attack.
         Cl (ArrayLike): Blade element lift coefficient.
         Cd (ArrayLike): Blade element drag coefficient.
-        F (Optional[ArrayLike]): Blade element tip loss (optional).
+        F (ArrayLike): Blade element tip loss.
 
     Properties:
         W: Blade element inflow magnitude.
@@ -56,7 +56,7 @@ class AerodynamicProperties:
     aoa: ArrayLike
     Cl: ArrayLike
     Cd: ArrayLike
-    F: Optional[ArrayLike] = None
+    F: ArrayLike = None
 
     def __post_init__(self):
         pass
@@ -74,20 +74,50 @@ class AerodynamicProperties:
         Blade element inflow direction.
         """
         return np.arctan2(self.Vax, self.Vtan)
-
+    
     @cached_property
-    def Ctan(self):
+    def C_n(self):
         """
-        Blade element tangengial force coefficient.
-        """
-        return self.Cl * np.sin(self.phi) - self.Cd * np.cos(self.phi)
-
-    @cached_property
-    def Cax(self):
-        """
-        Blade element axial force coefficient.
+        Blade element axial blade force coefficient.
         """
         return self.Cl * np.cos(self.phi) + self.Cd * np.sin(self.phi)
+
+    @cached_property
+    def C_tan(self):
+        """
+        Blade element tangential blade force coefficient.
+        """
+        return self.Cl * np.sin(self.phi) - self.Cd * np.cos(self.phi)
+    
+    @cached_property
+    def C_x(self):
+        """
+        Blade element axial area force coefficient.
+        """
+        return self.solidity * self.W**2 * self.C_n
+
+    @cached_property
+    def C_tau(self):
+        """
+        Blade element tangential area force coefficient.
+        """
+        return self.solidity * self.W**2 * self.C_tan
+    
+    @cached_property
+    def C_x_corr(self):
+        """
+        Corrected blade element area axial force coefficient.
+        """
+        return self.C_x / self.F
+    
+    @cached_property
+    def C_tau_corr(self):
+        """
+        Corrected blade element area tangential force coefficient.
+        """
+        return self.C_tau / self.F
+
+
 
 
 class AerodynamicModel(ABC):
@@ -105,9 +135,7 @@ class AerodynamicModel(ABC):
         wdir: ArrayLike,
     ) -> AerodynamicProperties:
         """
-        Performs the aerodynamic calculations in a blade-element code using the
-        method outlined in Howland et al. 2020. (Influence of atmospheric conditions
-        on the power production of utility-scale wind turbines in yaw misalignment)
+        Performs the aerodynamic calculations in a blade-element code.
 
         Args:
             an (ArrayLike): Axial induction radial profile.
@@ -143,9 +171,8 @@ class KraghAerodynamics(AerodynamicModel):
         """
         Performs the aerodynamic calculations in a blade-element code using the
         method outlined in Howland et al. 2020. (Influence of atmospheric conditions
-        on the power production of utility-scale wind turbines in yaw misalignment)
-
-        Depends on 2013 paper by Kragh and Hansen: https://doi.org/10.1002/we.1612
+        on the power production of utility-scale wind turbines in yaw misalignment),
+        which builds on 2013 paper by Kragh and Hansen: https://doi.org/10.1002/we.1612.
 
         Args:
             an (ArrayLike): Axial induction radial profile.
@@ -164,9 +191,17 @@ class KraghAerodynamics(AerodynamicModel):
         """
         local_yaw = wdir - yaw
 
-        Vax = U * ((1 - an) * np.cos(local_yaw * np.cos(geom.theta_mesh)) * np.cos(local_yaw * np.sin(geom.theta_mesh)))
-        Vtan = (1 + aprime) * tsr * geom.mu_mesh - U * (1 - an) * np.cos(local_yaw * np.sin(geom.theta_mesh)) * np.sin(
-            local_yaw * np.cos(geom.theta_mesh)
+        Vax = (
+            U
+            * (1 - an)
+            * np.cos(local_yaw * np.cos(geom.theta_mesh))
+            * np.cos(local_yaw * np.sin(geom.theta_mesh))
+        )
+        Vtan = (
+            (1 + aprime) * tsr * geom.mu_mesh
+            - U * (1 - an)
+            * np.cos(local_yaw * np.sin(geom.theta_mesh))
+            * np.sin(local_yaw * np.cos(geom.theta_mesh))
         )
 
         phi = np.arctan2(Vax, Vtan)
@@ -178,7 +213,16 @@ class KraghAerodynamics(AerodynamicModel):
         solidity = rotor.solidity(geom.mu_mesh)
 
         aero_props = AerodynamicProperties(
-            an, aprime, solidity, U * np.ones(geom.shape), wdir * np.ones(geom.shape), Vax, Vtan, aoa, Cl, Cd
+            an = an,
+            aprime = aprime,
+            solidity = solidity,
+            U = U * np.ones(geom.shape),
+            wdir = wdir * np.ones(geom.shape),
+            Vax = Vax,
+            Vtan = Vtan,
+            aoa = aoa,
+            Cl = Cl,
+            Cd = Cd,
         )
 
         return aero_props
@@ -199,8 +243,8 @@ class DefaultAerodynamics(AerodynamicModel):
     ) -> AerodynamicProperties:
         """
         Performs the aerodynamic calculations in a blade-element code using the
-        method outlined in Howland et al. 2020. (Influence of atmospheric conditions
-        on the power production of utility-scale wind turbines in yaw misalignment)
+        method outlined in the supplementary material in Liew et al., 2024:
+        https://www.nature.com/articles/s41467-024-50756-5
 
         Args:
             an (ArrayLike): Axial induction radial profile.
@@ -220,8 +264,11 @@ class DefaultAerodynamics(AerodynamicModel):
         local_yaw = -yaw
 
         Vax = U * ((1 - an) * np.cos(local_yaw))
-        Vtan = (1 + aprime) * tsr * geom.mu_mesh - U * np.cos(geom.theta_mesh) * np.sin(
-            local_yaw
+        Vtan = (
+            (1 + aprime) * tsr * geom.mu_mesh
+            - U * (1 - an)
+            * np.cos(geom.theta_mesh)
+            * np.sin(local_yaw)
         )
 
         phi = np.arctan2(Vax, Vtan)
@@ -233,7 +280,16 @@ class DefaultAerodynamics(AerodynamicModel):
         solidity = rotor.solidity(geom.mu_mesh)
 
         aero_props = AerodynamicProperties(
-            an, aprime, solidity, U * np.ones(geom.shape), wdir * np.ones(geom.shape), Vax, Vtan, aoa, Cl, Cd
+            an = an,
+            aprime = aprime,
+            solidity = solidity,
+            U = U * np.ones(geom.shape),
+            wdir = wdir * np.ones(geom.shape),
+            Vax = Vax,
+            Vtan = Vtan,
+            aoa = aoa,
+            Cl = Cl,
+            Cd = Cd,
         )
 
         return aero_props
