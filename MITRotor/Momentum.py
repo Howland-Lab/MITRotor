@@ -22,10 +22,6 @@ __all__ = [
 
 class MomentumModel(ABC):
     @abstractmethod
-    def compute_induction(self, Cx: ArrayLike, yaw: float) -> ArrayLike:
-        ...
-
-    @abstractmethod
     def __call__(
         self,
         aero_props: "AerodynamicProperties",
@@ -36,6 +32,16 @@ class MomentumModel(ABC):
         geom: "BEMGeometry",
     ) -> ArrayLike:
         ...
+
+    @abstractmethod
+    def compute_induction(self, Cx: ArrayLike, yaw: float) -> ArrayLike:
+        ...
+
+    @abstractmethod
+    def compute_initial_wake_velocities(self, Ct: float, yaw: float) -> ArrayLike:
+        ...
+
+
     
     def _func_rotor(
         self,
@@ -109,9 +115,13 @@ class ConstantInduction(MomentumModel):
     def __init__(self, a = 1/3):
         self.a = a
 
-    def _func(self, aero_props, pitch, tsr, yaw, rotor, geom) -> ArrayLike:
+    def compute_induction(self, Cx, yaw) -> ArrayLike:
         return self.a * np.ones_like(yaw)
-
+    
+    def compute_initial_wake_velocities(self, Ct: float, yaw: float) -> ArrayLike:
+        u4 = 1 - 2 * self.a
+        v4 = - (1/4) * Ct * np.sin(yaw)
+        return u4, v4
 
 
 class ClassicalMomentum(MomentumModel):
@@ -128,6 +138,11 @@ class ClassicalMomentum(MomentumModel):
 
     def compute_induction(self, Cx, yaw):
         return 0.5 * (1 - np.sqrt(1 - Cx))
+    
+    def compute_initial_wake_velocities(self, Ct: float, yaw: float) -> ArrayLike:
+        u4 = np.sqrt(1 - Ct)
+        v4 = - (1/4) * Ct * np.sin(yaw)
+        return u4, v4
 
 
 
@@ -167,6 +182,12 @@ class HeckMomentum(MomentumModel):
                 a[mask] = (Cx[mask] - Ctc) / slope + self.ac
 
         return a
+    
+    def compute_initial_wake_velocities(self, Ct: float, yaw: float) -> ArrayLike:
+        a = self.compute_induction(Ct, yaw)
+        u4 = 1 - Ct /(2  * (1 - a))
+        v4 = - (1/4) * Ct * np.sin(yaw)
+        return u4, v4
 
 
 class UnifiedMomentum(MomentumModel):
@@ -192,6 +213,10 @@ class UnifiedMomentum(MomentumModel):
     def compute_induction(self, Cx: ArrayLike, yaw: float) -> ArrayLike:
         sol = self.model_Ct(Cx, yaw)
         return sol.an
+    
+    def compute_initial_wake_velocities(self, Ct: float, yaw: float) -> ArrayLike:
+        sol = self.model_Ct(Ct, yaw)
+        return sol.u4[0], sol.v4[0]
 
 
 class MadsenMomentum(MomentumModel):
@@ -222,3 +247,8 @@ class MadsenMomentum(MomentumModel):
 
         an = Ct**3 * 0.0883 + Ct**2 * 0.0586 + Ct * 0.2460
         return an
+
+    def compute_initial_wake_velocities(self, Ct: float, yaw: float) -> ArrayLike:
+        u4 = np.sqrt(1 - Ct)
+        v4 = - (1/4) * Ct * np.sin(yaw)
+        return u4, v4

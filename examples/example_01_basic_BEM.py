@@ -23,5 +23,5 @@ if __name__ == "__main__":
     print(f"Local thrust coefficient: {sol.Ctprime():2.2f}")
     print(f"Axial induction: {sol.a():2.2f}")
     print(f"Rotor-effective windspeed: {sol.U():2.2f}")
-    print(f"Far-wake streamwise velocity: {sol.u4():2.2f}")
-    print(f"Far-wake lateral velocity: {sol.v4():2.2f}")
+    print(f"Far-wake streamwise velocity: {sol.u4:2.2f}")
+    print(f"Far-wake lateral velocity: {sol.v4:2.2f}")
