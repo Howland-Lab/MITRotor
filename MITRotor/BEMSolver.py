@@ -41,10 +41,8 @@ class BEMSolution:
     geom: BEMGeometry = field(repr=False)
     converged: bool
     niter: int
-
-    def __post_init__(self):
-        sol = Heck()(self.Ctprime(), self.yaw)
-        self._u4, self._v4 = sol.u4, sol.v4
+    u4: float
+    v4: float
 
     def a(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.an, grid)
@@ -99,12 +97,6 @@ class BEMSolution:
 
     def F(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.F, grid)
-
-    def u4(self):
-        return self._u4
-
-    def v4(self):
-        return self._v4
     
     def Cp(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         dCp = (
@@ -218,5 +210,7 @@ class BEM:
         an, aprime = result.x
         aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir)
         aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
+        avg_Ct = average(self.geometry, aero_props.C_x)
+        u4,v4 = self.momentum_model.compute_initial_wake_velocities(avg_Ct, yaw)
 
-        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter)
+        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4)
