@@ -38,7 +38,7 @@ class NoTipLoss(TipLossModel):
 
 
 class PrandtlTipLoss(TipLossModel):
-    def __init__(self, root_loss: bool = True, min_val: float = 0.00001):
+    def __init__(self, root_loss: bool = True, min_val: float = 0.5):
         self.root_loss = root_loss
         self.min_val = min_val
 
