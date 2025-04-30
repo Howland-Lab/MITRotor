@@ -53,7 +53,7 @@ class DefaultTangentialInduction(TangentialInductionModel):
         
 
         aprime = (
-            aero_props.C_tau_corr
+            np.clip(aero_props.C_tau_corr, -2, 2)
             / (4 * np.maximum(geom.mu_mesh, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(yaw))
         )
 
