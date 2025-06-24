@@ -42,12 +42,12 @@ class BEMGeometry:
         return X, Y, Z
 
     def annulus_average(self, X: ArrayLike):
-        X_azim = 1 / (2 * np.pi) * np.trapezoid(X, self.theta_mesh, axis=-1)
+        X_azim = 1 / (2 * np.pi) * np.trapez(X, self.theta_mesh, axis=-1)
 
         return X_azim
 
     def rotor_average(self, X: ArrayLike):
         # Takes annulus average quantities and performs rotor average
 
-        X_rotor = 2 * np.trapezoid(X * self.mu, self.mu)
+        X_rotor = 2 * np.trapez(X * self.mu, self.mu)
         return X_rotor
