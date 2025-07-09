@@ -216,7 +216,7 @@ class UnifiedMomentum(MomentumModel):
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float) -> ArrayLike:
         sol = self.model_Ct(Ct, yaw)
-        return sol.u4[0], sol.v4[0]
+        return sol.u4, sol.v4
 
 
 class MadsenMomentum(MomentumModel):

@@ -18,7 +18,6 @@ class Test_ClassicalMomentum:
         Ct_vec = np.array([0.1, 0.2, 0.3])
         ans = model.compute_induction(Ct_vec, 0.0)
         ans_expected = [0.02565835, 0.0527864, 0.08166999]
-
         assert_almost_equal(ans, ans_expected)
 
 
@@ -109,3 +108,32 @@ class Test_MadsenMomentum:
         ans = model.compute_induction(Ct_vec, 0.0)
         ans_expected = [0.02565835, 0.0527864, 0.08166999]
         assert_almost_equal(ans, ans_expected)
+
+@pytest.mark.parametrize("model", [ClassicalMomentum(), HeckMomentum(), UnifiedMomentum(), MadsenMomentum()])
+def test_types(model):
+    CT_float, yaw_float = 8 / 9, np.deg2rad(20)
+    # CT_arr, yaw_arr = np.array([CT_float]), np.array([yaw_float])
+
+    an = model.compute_induction(CT_float, yaw_float)
+    u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
+    assert isinstance(an, float)
+    assert isinstance(u4, float)
+    assert isinstance(v4, float)
+
+    # an = model.compute_induction(CT_arr, yaw_float)
+    # u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
+    # assert isinstance(an, np.ndarray)
+    # assert isinstance(u4, np.ndarray)
+    # assert isinstance(v4, np.ndarray)
+
+    # an = model.compute_induction(CT_float, yaw_arr)
+    # u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
+    # assert isinstance(an, np.ndarray)
+    # assert isinstance(u4, np.ndarray)
+    # assert isinstance(v4, np.ndarray)
+
+    # an = model.compute_induction(CT_arr, yaw_arr)
+    # u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
+    # assert isinstance(an, np.ndarray)
+    # assert isinstance(u4, np.ndarray)
+    # assert isinstance(v4, np.ndarray)
