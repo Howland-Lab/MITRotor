@@ -4574,7 +4574,7 @@ figures = ["dualitic @ git+https://github.com/jaimeliew1/Dualitic.git", "ipykern
 type = "git"
 url = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"
 reference = "sg/add_tilt"
-resolved_reference = "6186236218b63c559718d327a2d33bd38a86262a"
+resolved_reference = "4ea249c3e9519c2903b8e899c2390a878856c0fe"
 
 [[package]]
 name = "uri-template"
