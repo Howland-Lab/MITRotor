@@ -34,11 +34,10 @@ class Test_HeckMomentum:
 
     def test_scalar_yawed(self):
         model = HeckMomentum()
-        print(model.compute_induction(8 / 9, yaw = 0.0))
-        print(model.compute_induction(8 / 9, yaw = np.deg2rad(10)))
-        print(model.compute_induction(8 / 9, yaw = np.deg2rad(20)))
-        # assert_almost_equal(model.compute_induction(8 / 9, 0.1), 1 / 3)
-        assert False
+        u4_no_yaw, v4_no_yaw = model.compute_initial_wake_velocities(8 / 9, 0.0)
+        u4_yaw, v4_yaw = model.compute_initial_wake_velocities(8 / 9, 0.2)
+        assert u4_no_yaw > u4_yaw
+        assert np.abs(v4_yaw) > np.abs(v4_no_yaw)
 
     def test_edge(self):
         model = HeckMomentum()
@@ -67,10 +66,10 @@ class Test_UnifiedMomentum:
 
     def test_scalar_yawed(self):
         model = UnifiedMomentum()
-        print(model.compute_induction(8 / 9, 0.0))
-        print(model.compute_induction(8 / 9, 0.1))
-        print(model.compute_induction(8 / 9, 0.2))
-        assert False
+        u4_no_yaw, v4_no_yaw = model.compute_initial_wake_velocities(8 / 9, 0.0)
+        u4_yaw, v4_yaw = model.compute_initial_wake_velocities(8 / 9, 0.2)
+        assert u4_no_yaw > u4_yaw
+        assert np.abs(v4_yaw) > np.abs(v4_no_yaw)
 
     def test_edge(self):
         model = UnifiedMomentum()
