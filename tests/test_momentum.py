@@ -111,28 +111,8 @@ class Test_MadsenMomentum:
 @pytest.mark.parametrize("model", [ClassicalMomentum(), HeckMomentum(), UnifiedMomentum(), MadsenMomentum()])
 def test_types(model):
     CT_float, yaw_float = 8 / 9, np.deg2rad(20)
-    # CT_arr, yaw_arr = np.array([CT_float]), np.array([yaw_float])
-
     an = model.compute_induction(CT_float, yaw_float)
     u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
     assert isinstance(an, float)
     assert isinstance(u4, float)
     assert isinstance(v4, float)
-
-    # an = model.compute_induction(CT_arr, yaw_float)
-    # u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
-    # assert isinstance(an, np.ndarray)
-    # assert isinstance(u4, np.ndarray)
-    # assert isinstance(v4, np.ndarray)
-
-    # an = model.compute_induction(CT_float, yaw_arr)
-    # u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
-    # assert isinstance(an, np.ndarray)
-    # assert isinstance(u4, np.ndarray)
-    # assert isinstance(v4, np.ndarray)
-
-    # an = model.compute_induction(CT_arr, yaw_arr)
-    # u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
-    # assert isinstance(an, np.ndarray)
-    # assert isinstance(u4, np.ndarray)
-    # assert isinstance(v4, np.ndarray)
