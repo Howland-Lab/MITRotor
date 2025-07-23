@@ -41,7 +41,10 @@ class Test_HeckMomentum:
 
     def test_edge(self):
         model = HeckMomentum()
-        assert np.isnan(model.compute_induction(1.001, 0.0))
+        float_sol = model.compute_induction(1.001, 0.0)
+        arr_sol = model.compute_induction(np.array([1.001]), 0.0)
+        assert not np.isnan(float_sol)
+        assert float_sol == arr_sol[0]
 
     def test_vector(self):
         model = HeckMomentum()
