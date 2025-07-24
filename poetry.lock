@@ -4651,8 +4651,8 @@ figures = ["dualitic @ git+https://github.com/jaimeliew1/Dualitic.git", "ipykern
 [package.source]
 type = "git"
 url = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"
-reference = "sg/add_tilt"
-resolved_reference = "066004b6b2c22873fb1f2aab6f868516849528a2"
+reference = "HEAD"
+resolved_reference = "ebbfd35978a9a0855962501450960ec70b032bf2"
 
 [[package]]
 name = "uri-template"
@@ -4814,4 +4814,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "f62fe28b7ef3f1686a6c00b660f7184ae8fb7047cc2944e244bbd3590016b985"
+content-hash = "17b60b7f0f84b1543ebe4b7a60a1d2f82c598c22c88d20bcce764e657d644611"
