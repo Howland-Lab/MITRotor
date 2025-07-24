@@ -149,7 +149,9 @@ class ClassicalMomentum(MomentumModel):
 class HeckMomentum(MomentumModel):
     """
     Heck Momentum model based on 2023 paper:
-    https://doi.org/10.1017/jfm.2023.129 
+    https://doi.org/10.1017/jfm.2023.129
+
+    Note that this version takes in CT and has a high thrust correction when calculating induction.
     """
     def __init__(
         self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", ac: float = 1 / 3, v4_correction: float = 1.0
@@ -176,10 +178,15 @@ class HeckMomentum(MomentumModel):
             -4 + np.sqrt(-(Cx**2) * np.sin(yaw) ** 2 - 16 * Cx + 16)
         )
 
+        mask = Cx > Ctc
         if np.iterable(Cx):
-            mask = Cx > Ctc
             if np.any(mask):
                 a[mask] = (Cx[mask] - Ctc) / slope + self.ac
+        elif isinstance(Cx, (int, float)):
+            if mask:
+                a = (Cx - Ctc) / slope + self.ac
+        else:
+            raise ValueError(f"Unsupported type of Cx ({Cx}) - not iterable and not a float - so high thrust correction in Heck can't be applied.")
 
         return a
     
@@ -194,6 +201,8 @@ class UnifiedMomentum(MomentumModel):
     """
     Unified Momentum Model based on 2024 paper:
     https://www.nature.com/articles/s41467-024-50756-5 
+
+    Note that this version takes in CT and thus uses the thrust based unified momentum model.
     """
     def __init__(self, averaging: Literal["sector", "annulus", "rotor"] = "rotor", beta=0.1403):
         self.beta = beta
@@ -216,7 +225,7 @@ class UnifiedMomentum(MomentumModel):
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float) -> ArrayLike:
         sol = self.model_Ct(Ct, yaw)
-        return sol.u4[0], sol.v4[0]
+        return sol.u4, sol.v4
 
 
 class MadsenMomentum(MomentumModel):
