@@ -56,6 +56,7 @@ class AerodynamicProperties:
     aoa: ArrayLike
     Cl: ArrayLike
     Cd: ArrayLike
+    Cd_hub: ArrayLike
     F: ArrayLike = None
 
     def __post_init__(self):
@@ -94,7 +95,7 @@ class AerodynamicProperties:
         """
         Blade element axial area force coefficient.
         """
-        return self.solidity * self.W**2 * self.C_n
+        return  self.W**2 * (self.solidity * self.C_n + self.Cd_hub)
 
     @cached_property
     def C_tau(self):
@@ -211,6 +212,7 @@ class KraghAerodynamics(AerodynamicModel):
         Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
 
         solidity = rotor.solidity(geom.mu_mesh)
+        Cd_hub = rotor.hub_drag(geom.mu_mesh)
 
         aero_props = AerodynamicProperties(
             an = an,
@@ -223,6 +225,7 @@ class KraghAerodynamics(AerodynamicModel):
             aoa = aoa,
             Cl = Cl,
             Cd = Cd,
+            Cd_hub = Cd_hub,
         )
 
         return aero_props
@@ -279,6 +282,8 @@ class DefaultAerodynamics(AerodynamicModel):
 
         solidity = rotor.solidity(geom.mu_mesh)
 
+        Cd_hub = rotor.hub_drag(geom.mu_mesh)
+
         aero_props = AerodynamicProperties(
             an = an,
             aprime = aprime,
@@ -290,6 +295,7 @@ class DefaultAerodynamics(AerodynamicModel):
             aoa = aoa,
             Cl = Cl,
             Cd = Cd,
+            Cd_hub = Cd_hub,
         )
 
         return aero_props

@@ -77,6 +77,7 @@ class RotorDefinition:
 
         hub_diameter = windio["components"]["hub"]["diameter"]
         hub_radius = hub_diameter / 2
+        hub_drag_coefficient = windio["components"]["hub"]["drag_coefficient"]
         cone = windio["components"]["hub"]["cone_angle"]  # deg
         blade = windio["components"]["blade"]
 
@@ -103,6 +104,8 @@ class RotorDefinition:
             1,
         )
 
+        hub_drag_func = lambda mu: (hub_drag_coefficient * np.ones_like(mu)) * (mu <= hub_radius / R)
+
         airfoil_func = BladeAirfoils.from_windio(windio, hub_radius, R)
 
         return cls(
@@ -116,6 +119,7 @@ class RotorDefinition:
             hub_height,
             tsr_target,
             hub_radius,
+            hub_drag_func,
             name=name,
         )
 
@@ -131,6 +135,7 @@ class RotorDefinition:
         hub_height,
         tsr_target,
         hub_radius,
+        hub_drag_func,
         name=None,
     ):
         self.name = name
@@ -142,6 +147,7 @@ class RotorDefinition:
         self.hub_height = hub_height
         self.tsr_target = tsr_target
         self.hub_radius = hub_radius
+        self.hub_drag_func = hub_drag_func
 
         self.twist_func = twist_func
         self.solidity_func = solidity_func
@@ -155,3 +161,6 @@ class RotorDefinition:
 
     def clcd(self, mu, aoa):
         return self.airfoil_func(mu, aoa)
+    
+    def hub_drag(self, mu):
+        return self.hub_drag_func(mu)
