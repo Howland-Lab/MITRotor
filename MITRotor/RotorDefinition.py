@@ -104,7 +104,10 @@ class RotorDefinition:
             1,
         )
 
-        hub_drag_func = lambda mu: (hub_drag_coefficient * np.ones_like(mu)) * (mu <= hub_radius / R)
+        hub_drag_func = (lambda mu: 
+                         (hub_drag_coefficient * np.ones_like(mu)) *
+                         (mu <= hub_radius / R) *
+                        (hub_radius / R) ** 2)
 
         airfoil_func = BladeAirfoils.from_windio(windio, hub_radius, R)
 
