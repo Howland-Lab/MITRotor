@@ -80,7 +80,7 @@ class MomentumModel(ABC):
             
                 geom.annulus_average(
                     np.clip(aero_props.C_x_corr, 0, 3) *
-                    (geom.mu > rotor.hub_radius / rotor.R)  # Only consider points outside the hub
+                    (geom.mu_mesh > rotor.hub_radius / rotor.R)  # Only consider points outside the hub
                     )
                     )[:, None] * np.ones(geom.shape)
         
