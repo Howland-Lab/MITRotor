@@ -56,7 +56,7 @@ class MomentumModel(ABC):
         rotor_avg_axial_force = (
             geom.rotor_average(
                 geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, 0, 3)
+                    np.clip(aero_props.C_x_corr, 0, 10)
                     ) *
                     (geom.mu > rotor.hub_radius / rotor.R)  # Only consider points outside the hub
                     )
@@ -79,7 +79,7 @@ class MomentumModel(ABC):
         annulus_avg_axial_force = (
             
                 geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, 0, 3) *
+                    np.clip(aero_props.C_x_corr, 0, 10) *
                     (geom.mu_mesh > rotor.hub_radius / rotor.R)  # Only consider points outside the hub
                     )
                     )[:, None] * np.ones(geom.shape)
