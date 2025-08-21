@@ -53,7 +53,7 @@ class PrandtlTipLoss(TipLossModel):
         phi = aero_props.phi
         R_hub = rotor.hub_radius / rotor.R
         f_tip = (
-            rotor.N_blades / (2 * (1 - geometry.mu_mesh) / (np.maximum(geometry.mu_mesh, 0.0001) * np.clip(np.abs(np.sin(phi)), -0.9999, 0.9999)) + 1e-6)
+            rotor.N_blades / 2 * (1 - geometry.mu_mesh) / ((np.maximum(geometry.mu_mesh, 0.0001) * np.clip(np.abs(np.sin(phi)), -0.9999, 0.9999)) + 1e-6)
         )
         F_tip = 2 / np.pi * np.arccos(np.clip(np.exp(-np.clip(f_tip, -100, 100)), -0.9999, 0.9999))
 
