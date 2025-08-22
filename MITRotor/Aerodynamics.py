@@ -95,8 +95,8 @@ class AerodynamicProperties:
         """
         Blade element axial area force coefficient.
         """
-        # return  (self.W**2 * self.solidity * self.C_n + self.Vax**2 * self.Cd_hub) * self.F
-        return  (self.W**2 * self.solidity * self.C_n) * self.F
+        return  (self.W**2 * self.solidity * self.C_n + self.Vax**2 * self.Cd_hub) * self.F
+        # return  (self.W**2 * self.solidity * self.C_n) * self.F
 
 
     @cached_property
