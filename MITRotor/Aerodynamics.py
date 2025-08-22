@@ -95,7 +95,9 @@ class AerodynamicProperties:
         """
         Blade element axial area force coefficient.
         """
-        return  self.W**2 * self.solidity * self.C_n + self.Vax**2 * self.Cd_hub
+        # return  (self.W**2 * self.solidity * self.C_n + self.Vax**2 * self.Cd_hub) * self.F
+        return  (self.W**2 * self.solidity * self.C_n) * self.F
+
 
     @cached_property
     def C_tau(self):
@@ -109,7 +111,7 @@ class AerodynamicProperties:
         """
         Corrected blade element area axial force coefficient.
         """
-        return self.C_x / self.F
+        return self.C_x
     
     @cached_property
     def C_tau_corr(self):
