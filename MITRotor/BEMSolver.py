@@ -103,6 +103,7 @@ class BEMSolution:
             self.tsr
             * self.geom.mu_mesh
             * self.Ctau_uncorr(grid="sector")
+            * self.F(grid="sector")
         )
         return average(self.geom, dCp, grid=grid)
     
