@@ -118,7 +118,7 @@ class AerodynamicProperties:
         """
         Corrected blade element area tangential force coefficient.
         """
-        return self.C_tau / self.F
+        return self.C_tau
 
 
 
