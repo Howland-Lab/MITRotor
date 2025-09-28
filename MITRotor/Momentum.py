@@ -73,7 +73,7 @@ class MomentumModel(ABC):
 
         a_scaled = a_raw / F_int
 
-        return a_scaled[:, None] * np.ones(geom.shape)
+        return a_scaled * np.ones(geom.shape)
 
 
     def _func_annulus(
