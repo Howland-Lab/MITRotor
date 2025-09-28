@@ -71,9 +71,10 @@ class MomentumModel(ABC):
             )
         )
 
-        a_scaled = a_raw * aero_props.F / F_int
+        # a_scaled = a_raw * aero_props.F / F_int
 
-        return a_scaled
+        # return a_scaled
+        return a_raw * np.ones(geom.shape)
 
 
     def _func_annulus(
