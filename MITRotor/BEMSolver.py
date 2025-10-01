@@ -87,12 +87,15 @@ class BEMSolution:
         return average(self.geom, self.aero_props.C_tan, grid)
 
     def Cx(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
+        return average(self.geom, self.aero_props.C_x, grid)
+    
+    def Cx_corr(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_x_corr, grid)
 
-    def Ctau(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def Ctau_corr(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_tau_corr, grid)
     
-    def Ctau_uncorr(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def Ctau(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_tau, grid)
 
     def F(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -102,7 +105,7 @@ class BEMSolution:
         dCp = (
             self.tsr
             * self.geom.mu_mesh
-            * self.Ctau(grid="sector")
+            * self.Ctau_corr(grid="sector")
         )
         return average(self.geom, dCp, grid=grid)
     
@@ -110,7 +113,7 @@ class BEMSolution:
         dCp = (
             self.tsr
             * self.geom.mu_mesh
-            * self.Ctau(grid="sector")
+            * self.Ctau_corr(grid="sector")
         )
         return average(self.geom, dCp, grid=grid)
     

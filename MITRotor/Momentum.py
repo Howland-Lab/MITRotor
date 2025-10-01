@@ -56,7 +56,7 @@ class MomentumModel(ABC):
         rotor_avg_axial_force = (
             geom.rotor_average(
                 geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, 0, 3)
+                    np.clip(aero_props.C_x * aero_props.F, 0, 3)
                     )
             )
         )
@@ -71,10 +71,10 @@ class MomentumModel(ABC):
             )
         )
 
-        # a_scaled = a_raw * aero_props.F / F_int
+        a_scaled = a_raw * aero_props.F / F_int
 
-        # return a_scaled
-        return a_raw * np.ones(geom.shape)
+        return a_scaled
+        # return a_raw * np.ones(geom.shape)
 
 
     def _func_annulus(
@@ -88,9 +88,8 @@ class MomentumModel(ABC):
     ) -> ArrayLike:
         
         annulus_avg_axial_force = (
-            
                 geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, 0, 1.69)
+                    np.clip(aero_props.C_x * aero_props.F, 0, 1.69)
                     )
                     )[:, None] * np.ones(geom.shape)
         
