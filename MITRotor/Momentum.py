@@ -61,7 +61,7 @@ class MomentumModel(ABC):
                     )
         )
 
-        return self.compute_induction(rotor_avg_axial_force, yaw)
+        return np.clip(self.compute_induction(rotor_avg_axial_force, yaw) / aero_props.F, 0, 1)
 
 
 
@@ -83,7 +83,7 @@ class MomentumModel(ABC):
                     )[:, None] * np.ones(geom.shape)
         
 
-        return self.compute_induction(annulus_avg_axial_force, yaw)
+        return np.clip(self.compute_induction(annulus_avg_axial_force, yaw) / aero_props.F, 0, 1)
 
     def _func_sector(
         self,
@@ -96,7 +96,7 @@ class MomentumModel(ABC):
     ) -> ArrayLike:
         axial_force = np.clip(aero_props.C_x, 0, 1.69)
 
-        return self.compute_induction(axial_force, yaw)
+        return np.clip(self.compute_induction(axial_force, yaw) / aero_props.F, 0, 1)
 
     def __call__(
         self,
