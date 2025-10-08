@@ -90,6 +90,20 @@ class AerodynamicProperties:
         return self.Cl * np.sin(self.phi) - self.Cd * np.cos(self.phi)
     
     @cached_property
+    def C_n_corr(self):
+        """
+        Blade element axial blade force coefficient.
+        """
+        return self.Cl * np.cos(self.phi) * self.F + self.Cd * np.sin(self.phi)
+
+    @cached_property
+    def C_tan_corr(self):
+        """
+        Blade element tangential blade force coefficient.
+        """
+        return self.Cl * np.sin(self.phi) * self.F - self.Cd * np.cos(self.phi)
+    
+    @cached_property
     def C_x(self):
         """
         Blade element axial area force coefficient.
@@ -108,14 +122,14 @@ class AerodynamicProperties:
         """
         Corrected blade element area axial force coefficient.
         """
-        return self.C_x * self.F
+        return self.solidity * self.W**2 * self.C_n_corr
     
     @cached_property
     def C_tau_corr(self):
         """
         Corrected blade element area tangential force coefficient.
         """
-        return self.C_tau * self.F
+        return self.solidity * self.W**2 * self.C_tan_corr
 
 
 
