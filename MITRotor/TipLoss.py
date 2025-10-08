@@ -230,7 +230,7 @@ class GoldsteinTipLoss(TipLossModel):
     ):
         phi = aero_props.phi
         R_hub = rotor.hub_radius / rotor.R
-        l_bar = 1 / (2 * np.pi * tsr)  # dimensionless torsional parameter h/(2 pi R)
+        l_bar = 1 / (tsr)  # dimensionless torsional parameter h/(2 pi R)
         B = rotor.N_blades
         N = len(geometry.mu)  # number of radial positions
         G, vr = f_goldstein_factor(l_bar, B, N)
