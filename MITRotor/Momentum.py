@@ -105,7 +105,7 @@ class MomentumModel(ABC):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        axial_force = np.clip(aero_props.C_x_corr, 0, 1.69)
+        axial_force = np.clip(aero_props.C_x_corr, -1, 4)
 
         return self.compute_induction(axial_force, yaw)
 
