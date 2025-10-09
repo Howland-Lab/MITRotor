@@ -235,7 +235,8 @@ class GoldsteinTipLoss(TipLossModel):
         N = len(geometry.mu)  # number of radial positions
         G, vr = f_goldstein_factor(l_bar, B, N)
         lambda_r = tsr * vr
-        F_go = (1 + lambda_r**2) / lambda_r**2 * G
+        # F_go = (1 + lambda_r**2) / lambda_r**2 * G
+        F_go = (1 + lambda_r**2) / (lambda_r + 1e-4)**2 * G
 
         # Interpolate G to mu_mesh
         # G_interp = np.interp(geometry.mu_mesh, vr, G)
