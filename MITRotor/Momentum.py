@@ -78,7 +78,7 @@ class MomentumModel(ABC):
         annulus_avg_axial_force = (
             
                 geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, 0, 1.69)
+                    np.clip(aero_props.C_x_corr, 0, 4)
                     )
                     )[:, None] * np.ones(geom.shape)
         
@@ -94,7 +94,7 @@ class MomentumModel(ABC):
         rotor: "RotorDefinition",
         geom: "BEMGeometry",
     ) -> ArrayLike:
-        axial_force = np.clip(aero_props.C_x_corr, 0, 1.69)
+        axial_force = np.clip(aero_props.C_x_corr, 0, 4)
 
         return self.compute_induction(axial_force, yaw)
 

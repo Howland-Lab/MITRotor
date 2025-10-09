@@ -151,7 +151,7 @@ class BEM:
     ):
         self.rotor = rotor
 
-        self.geometry: BEMGeometry = geometry or BEMGeometry(Nr=10, Ntheta=20)
+        self.geometry: BEMGeometry = geometry or BEMGeometry(Nr=30, Ntheta=16)
         self.aerodynamic_model = aerodynamic_model or DefaultAerodynamics()
         self.tiploss_model: TipLoss.TipLossModel = tiploss_model or TipLoss.PrandtlTipLoss(root_loss=True)
         self.momentum_model: Momentum.MomentumModel = momentum_model or Momentum.HeckMomentum()
