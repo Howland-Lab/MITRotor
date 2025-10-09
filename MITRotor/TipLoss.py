@@ -234,8 +234,12 @@ class GoldsteinTipLoss(TipLossModel):
         B = rotor.N_blades
         N = len(geometry.mu)  # number of radial positions
         G, vr = f_goldstein_factor(l_bar, B, N)
+        lambda_r = tsr * vr
+        F_go = (1 + lambda_r**2) / lambda_r**2 * G
 
         # Interpolate G to mu_mesh
-        G_interp = np.interp(geometry.mu_mesh, vr, G)
+        # G_interp = np.interp(geometry.mu_mesh, vr, G)
+        F_interp = np.interp(geometry.mu_mesh, vr, F_go)
 
-        return G_interp
+        # return G_interp
+        return np.clip(F_interp, 0, 1)
