@@ -27,12 +27,12 @@ class BEMGeometry:
     def dtheta(self):
         return self.theta[1] - self.theta[0]
 
-    def cartesian(self, yaw: float) -> Tuple[ArrayLike, ...]:
+    def cartesian(self, yaw: float, tilt: float) -> Tuple[ArrayLike, ...]:
         """
         Returns the grid point locations in cartesian coordinates
         nondimensionialized by rotor radius. Origin is located at hub center.
 
-        Note: effect of yaw angle on grid points is not yet implemented.
+        Note: effect of yaw and tilt anglea on grid points is not yet implemented.
         """
         # Probable sign error here.
         X = np.zeros_like(self.mu_mesh)

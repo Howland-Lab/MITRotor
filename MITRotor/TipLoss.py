@@ -20,6 +20,7 @@ class TipLossModel(ABC):
         yaw: float,
         rotor: "RotorDefinition",
         geometry: "BEMGeometry",
+        tilt: float = 0.0,
     ) -> ArrayLike:
         ...
 
@@ -33,6 +34,7 @@ class NoTipLoss(TipLossModel):
         yaw: float,
         rotor: "RotorDefinition",
         geometry: "BEMGeometry",
+        tilt: float = 0.0,
     ):
         return np.ones_like(geometry.mu_mesh)
 
@@ -49,6 +51,7 @@ class PrandtlTipLoss(TipLossModel):
         yaw: float,
         rotor: "RotorDefinition",
         geometry: "BEMGeometry",
+        tilt: float = 0.0,
     ):
         phi = aero_props.phi
         R_hub = rotor.hub_radius / rotor.R

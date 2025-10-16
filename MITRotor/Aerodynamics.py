@@ -133,6 +133,7 @@ class AerodynamicModel(ABC):
         geom: BEMGeometry,
         U: ArrayLike,
         wdir: ArrayLike,
+        tilt: float = 0,
     ) -> AerodynamicProperties:
         """
         Performs the aerodynamic calculations in a blade-element code.
@@ -147,6 +148,7 @@ class AerodynamicModel(ABC):
             geom (BEMGeometry): Blade element geometry object.
             U (ArrayLike): Inflow velocity on polar grid.
             wdir (ArrayLike): Inflow direction on polar grid.
+            tilt (float): Rotor tilt angle [rad].
 
         Returns:
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
@@ -167,6 +169,7 @@ class KraghAerodynamics(AerodynamicModel):
         geom: BEMGeometry,
         U: ArrayLike,
         wdir: ArrayLike,
+        tilt: float = 0.0,
     ) -> AerodynamicProperties:
         """
         Performs the aerodynamic calculations in a blade-element code using the
@@ -184,11 +187,14 @@ class KraghAerodynamics(AerodynamicModel):
             geom (BEMGeometry): Blade element geometry object.
             U (ArrayLike): Inflow velocity on polar grid.
             wdir (ArrayLike): Inflow direction on polar grid.
+            tilt (float): Rotor tilt angle [rad].
 
         Returns:
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
         """
+        if tilt != 0:
+            raise ValueError("Tilt not supported by the KraghAerodynamics model. Use DefaultAerodynamics.")
         local_yaw = wdir - yaw
 
         Vax = (
@@ -240,6 +246,7 @@ class DefaultAerodynamics(AerodynamicModel):
         geom: BEMGeometry,
         U: ArrayLike,
         wdir: ArrayLike,
+        tilt: float = 0.0,
     ) -> AerodynamicProperties:
         """
         Performs the aerodynamic calculations in a blade-element code using the
@@ -261,6 +268,7 @@ class DefaultAerodynamics(AerodynamicModel):
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
         """
+        # TODO: add in tilt!!
         local_yaw = -yaw
 
         Vax = U * ((1 - an) * np.cos(local_yaw))

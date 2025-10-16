@@ -43,6 +43,8 @@ class BEMSolution:
     niter: int
     u4: float
     v4: float
+    tilt: float = 0.0
+    w4: float = 0
 
     def a(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.an, grid)
@@ -123,6 +125,7 @@ class BEMSolution:
         return average(self.geom, _Ct, grid=grid)
 
     def Ctprime(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
+        # TODO add in tilt
         Ctprime = self.Ct(grid="sector") / ((1 - self.a(grid="sector")) ** 2 * np.cos(self.yaw) ** 2)
         return average(self.geom, Ctprime, grid=grid)
 
@@ -162,12 +165,12 @@ class BEM:
     def __call__(self, pitch: float, tsr: float, yaw: float) -> BEMSolution:
         ...
 
-    def sample_points(self, yaw: float = 0.0) -> tuple[ArrayLike, ArrayLike, ArrayLike]:
-        X, Y, Z = self.geometry.cartesian(yaw)
+    def sample_points(self, yaw: float = 0.0, tilt: float = 0.0) -> tuple[ArrayLike, ArrayLike, ArrayLike]:
+        X, Y, Z = self.geometry.cartesian(yaw, tilt)
         return X, Y, Z
 
     def initial_guess(
-        self, pitch: float, tsr: float, yaw: float = 0.0, U: ArrayLike = 1.0, wdir: ArrayLike = 0.0
+        self, pitch: float, tsr: float, yaw: float = 0.0, tilt: float = 0.0, U: ArrayLike = 1.0, wdir: ArrayLike = 0.0
     ) -> Tuple[ArrayLike, ...]:
         a = (1 / 3) * np.ones(self.geometry.shape)
         aprime = np.zeros(self.geometry.shape)
@@ -182,6 +185,7 @@ class BEM:
         yaw: ArrayLike = 0.0,
         U: ArrayLike = None,
         wdir: ArrayLike = None,
+        tilt: ArrayLike = 0.0,
     ) -> Tuple[ArrayLike, ...]:
         an, aprime = x
         U = np.ones(self.geometry.shape) if U is None else U
@@ -196,21 +200,23 @@ class BEM:
             rotor=self.rotor, 
             geom=self.geometry, 
             U=U, 
-            wdir=wdir)
+            wdir=wdir,
+            tilt = tilt,
+        )
         
-        aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
-        e_an = self.momentum_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry) - an
-        e_aprime = self.tangential_induction_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry) - aprime
+        aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt)
+        e_an = self.momentum_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt) - an
+        e_aprime = self.tangential_induction_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt) - aprime
 
         return e_an, e_aprime
 
-    def post_process(self, result: FixedPointIterationResult, pitch, tsr, yaw, U=None, wdir=None) -> BEMSolution:
+    def post_process(self, result: FixedPointIterationResult, pitch, tsr, yaw, U=None, wdir=None, tilt: float = 0.0) -> BEMSolution:
         U = np.ones(self.geometry.shape) if U is None else U
         wdir = np.zeros(self.geometry.shape) if wdir is None else wdir
         an, aprime = result.x
-        aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir)
-        aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry)
+        aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir, tilt = tilt)
+        aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt)
         avg_Ct = average(self.geometry, aero_props.C_x)
-        u4,v4 = self.momentum_model.compute_initial_wake_velocities(avg_Ct, yaw)
+        u4,v4,w4 = self.momentum_model.compute_initial_wake_velocities(avg_Ct, yaw, tilt = tilt)
 
-        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4)
+        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4, tilt = tilt, w4 = w4)
