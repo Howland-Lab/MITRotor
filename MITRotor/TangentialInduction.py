@@ -5,6 +5,7 @@ from numpy.typing import ArrayLike
 from .Aerodynamics import AerodynamicProperties
 from .Geometry import BEMGeometry
 from .RotorDefinition import RotorDefinition
+from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 __all__ = [
     "TangentialInductionModel",
@@ -53,12 +54,10 @@ class DefaultTangentialInduction(TangentialInductionModel):
         geom: BEMGeometry,
         tilt: float = 0.0,
     ) -> ArrayLike:
-        
-
+        eff_yaw = calc_eff_yaw(yaw, tilt)
         aprime = (
             np.clip(aero_props.C_tau_corr, -2, 2)
-            / (4 * np.maximum(geom.mu_mesh, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(yaw))
+            / (4 * np.maximum(geom.mu_mesh, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(eff_yaw))
         )
-        # TODO: add in effects of tilt
 
         return aprime

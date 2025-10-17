@@ -8,6 +8,7 @@ from numpy.typing import ArrayLike
 
 from .RotorDefinition import RotorDefinition
 from .Geometry import BEMGeometry
+from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 __all__ = [
     "AerodynamicModel",
@@ -268,15 +269,15 @@ class DefaultAerodynamics(AerodynamicModel):
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
         """
-        # TODO: add in tilt!!
         local_yaw = -yaw
-
-        Vax = U * ((1 - an) * np.cos(local_yaw))
+        # rotate to a yaw-only frame that includes tilt
+        eff_yaw = calc_eff_yaw(local_yaw, tilt)
+        Vax = U * ((1 - an) * np.cos(eff_yaw))
         Vtan = (
             (1 + aprime) * tsr * geom.mu_mesh
             - U * (1 - an)
             * np.cos(geom.theta_mesh)
-            * np.sin(local_yaw)
+            * np.sin(eff_yaw)
         )
 
         phi = np.arctan2(Vax, Vtan)

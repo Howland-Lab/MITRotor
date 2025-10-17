@@ -11,6 +11,7 @@ from .Aerodynamics import AerodynamicModel, AerodynamicProperties, DefaultAerody
 from .Geometry import BEMGeometry
 from .RotorDefinition import RotorDefinition
 from .TangentialInduction import DefaultTangentialInduction, TangentialInductionModel
+from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 
 def average(geometry: BEMGeometry, value: ArrayLike, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -125,8 +126,8 @@ class BEMSolution:
         return average(self.geom, _Ct, grid=grid)
 
     def Ctprime(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        # TODO add in tilt
-        Ctprime = self.Ct(grid="sector") / ((1 - self.a(grid="sector")) ** 2 * np.cos(self.yaw) ** 2)
+        eff_yaw = calc_eff_yaw(self.yaw, self.tilt)
+        Ctprime = self.Ct(grid="sector") / ((1 - self.a(grid="sector")) ** 2 * np.cos(eff_yaw) ** 2)
         return average(self.geom, Ctprime, grid=grid)
 
 
