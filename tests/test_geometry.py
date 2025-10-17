@@ -24,7 +24,7 @@ def test_delta():
 def test_cartesian():
     geom = Geometry.BEMGeometry(10, 20)
 
-    X, Y, Z = geom.cartesian(0)
+    X, Y, Z = geom.cartesian(0, 0)
 
     assert X.shape == geom.shape
     assert Y.shape == geom.shape

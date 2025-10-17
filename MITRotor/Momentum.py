@@ -130,7 +130,8 @@ class ConstantInduction(MomentumModel):
             raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         u4 = 1 - 2 * self.a
         v4 = - (1/4) * Ct * np.sin(yaw)
-        return u4, v4
+        w4 = 0.0
+        return u4, v4, w4
 
 
 class ClassicalMomentum(MomentumModel):
@@ -155,7 +156,8 @@ class ClassicalMomentum(MomentumModel):
             raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         u4 = np.sqrt(1 - Ct)
         v4 = - (1/4) * Ct * np.sin(yaw)
-        return u4, v4
+        w4 = 0.0
+        return u4, v4, w4
 
 
 
@@ -211,7 +213,8 @@ class HeckMomentum(MomentumModel):
         a = self.compute_induction(Ct, yaw)
         u4 = 1 - Ct /(2  * (1 - a))
         v4 = - (1/4) * Ct * np.sin(yaw)
-        return u4, v4
+        w4 = 0.0
+        return u4, v4, w4
 
 
 class UnifiedMomentum(MomentumModel):

@@ -34,8 +34,8 @@ class Test_HeckMomentum:
 
     def test_scalar_yawed(self):
         model = HeckMomentum()
-        u4_no_yaw, v4_no_yaw = model.compute_initial_wake_velocities(8 / 9, 0.0)
-        u4_yaw, v4_yaw = model.compute_initial_wake_velocities(8 / 9, 0.2)
+        u4_no_yaw, v4_no_yaw, _ = model.compute_initial_wake_velocities(8 / 9, 0.0)
+        u4_yaw, v4_yaw, _ = model.compute_initial_wake_velocities(8 / 9, 0.2)
         assert u4_no_yaw > u4_yaw
         assert np.abs(v4_yaw) > np.abs(v4_no_yaw)
 
@@ -69,10 +69,19 @@ class Test_UnifiedMomentum:
 
     def test_scalar_yawed(self):
         model = UnifiedMomentum()
-        u4_no_yaw, v4_no_yaw = model.compute_initial_wake_velocities(8 / 9, 0.0)
-        u4_yaw, v4_yaw = model.compute_initial_wake_velocities(8 / 9, 0.2)
+        u4_no_yaw, v4_no_yaw, w4_no_yaw = model.compute_initial_wake_velocities(8 / 9, yaw = 0.0, tilt = 0.0)
+        u4_yaw, v4_yaw, w4_yaw = model.compute_initial_wake_velocities(8 / 9, yaw = 0.2, tilt = 0.0)
         assert u4_no_yaw > u4_yaw
         assert np.abs(v4_yaw) > np.abs(v4_no_yaw)
+        assert w4_no_yaw == w4_yaw
+
+    def test_scalar_tilted(self):
+        model = UnifiedMomentum()
+        u4_no_tilt, v4_no_tilt, w4_no_tilt = model.compute_initial_wake_velocities(8 / 9, yaw = 0.0, tilt = 0.0)
+        u4_tilt, v4_tilt, w4_tilt = model.compute_initial_wake_velocities(8 / 9, yaw = 0.0, tilt = 0.2)
+        assert u4_no_tilt > u4_tilt
+        assert np.abs(w4_tilt) > np.abs(w4_no_tilt)
+        assert v4_no_tilt == v4_tilt
 
     def test_edge(self):
         model = UnifiedMomentum()
@@ -115,7 +124,8 @@ class Test_MadsenMomentum:
 def test_types(model):
     CT_float, yaw_float = 8 / 9, np.deg2rad(20)
     an = model.compute_induction(CT_float, yaw_float)
-    u4, v4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
+    u4, v4, w4 = model.compute_initial_wake_velocities(CT_float, yaw_float)
     assert isinstance(an, float)
     assert isinstance(u4, float)
     assert isinstance(v4, float)
+    assert isinstance(w4, float)
