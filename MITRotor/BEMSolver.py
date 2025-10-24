@@ -162,9 +162,6 @@ class BEM:
 
         # self._solidity = self.rotor.solidity(self.geometry.mu)
 
-    def __call__(self, pitch: float, tsr: float, yaw: float = 0) -> BEMSolution:
-        ...
-
     def sample_points(self, yaw: float = 0.0, tilt: float = 0.0) -> tuple[ArrayLike, ArrayLike, ArrayLike]:
         X, Y, Z = self.geometry.cartesian(yaw, tilt)
         return X, Y, Z
