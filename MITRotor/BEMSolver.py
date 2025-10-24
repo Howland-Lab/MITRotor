@@ -3,7 +3,6 @@ from typing import Literal, Optional, Tuple
 
 import numpy as np
 from numpy.typing import ArrayLike
-from UnifiedMomentumModel.Momentum import Heck
 from UnifiedMomentumModel.Utilities.FixedPointIteration import FixedPointIterationResult, adaptivefixedpointiteration
 
 from . import Momentum, TipLoss
@@ -163,7 +162,7 @@ class BEM:
 
         # self._solidity = self.rotor.solidity(self.geometry.mu)
 
-    def __call__(self, pitch: float, tsr: float, yaw: float) -> BEMSolution:
+    def __call__(self, pitch: float, tsr: float, yaw: float = 0) -> BEMSolution:
         ...
 
     def sample_points(self, yaw: float = 0.0, tilt: float = 0.0) -> tuple[ArrayLike, ArrayLike, ArrayLike]:
@@ -211,7 +210,7 @@ class BEM:
 
         return e_an, e_aprime
 
-    def post_process(self, result: FixedPointIterationResult, pitch, tsr, yaw, U=None, wdir=None, tilt: float = 0.0) -> BEMSolution:
+    def post_process(self, result: FixedPointIterationResult, pitch, tsr, yaw = 0, U=None, wdir=None, tilt = 0.0) -> BEMSolution:
         U = np.ones(self.geometry.shape) if U is None else U
         wdir = np.zeros(self.geometry.shape) if wdir is None else wdir
         an, aprime = result.x
