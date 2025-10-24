@@ -166,9 +166,7 @@ class BEM:
         X, Y, Z = self.geometry.cartesian(yaw, tilt)
         return X, Y, Z
 
-    def initial_guess(
-        self, pitch: float, tsr: float, yaw: float = 0.0, tilt: float = 0.0, U: ArrayLike = 1.0, wdir: ArrayLike = 0.0
-    ) -> Tuple[ArrayLike, ...]:
+    def initial_guess(self, *args, **kwargs) -> Tuple[ArrayLike, ...]:
         a = (1 / 3) * np.ones(self.geometry.shape)
         aprime = np.zeros(self.geometry.shape)
 
