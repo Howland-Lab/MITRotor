@@ -239,12 +239,12 @@ class UnifiedMomentum(MomentumModel):
 
         self.model_Ct = UMM.ThrustBasedUnified(beta=beta)
 
-    def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        sol = self.model_Ct(Cx, yaw = yaw, tilt = tilt)
+    def compute_induction(self, *args, **kwargs) -> ArrayLike:
+        sol = self.model_Ct(*args, **kwargs)
         return sol.an
     
-    def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        sol = self.model_Ct(Ct, yaw = yaw, tilt = tilt)
+    def compute_initial_wake_velocities(self, *args, **kwargs) -> ArrayLike:
+        sol = self.model_Ct(*args, **kwargs)
         return sol.u4, sol.v4, sol.w4
 
 
