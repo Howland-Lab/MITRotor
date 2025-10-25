@@ -153,12 +153,14 @@ class BEM:
         aerodynamic_model: Optional[AerodynamicModel] = None,
     ):
         self.rotor = rotor
-
         self.geometry: BEMGeometry = geometry or BEMGeometry(Nr=10, Ntheta=20)
         self.aerodynamic_model = aerodynamic_model or DefaultAerodynamics()
         self.tiploss_model: TipLoss.TipLossModel = tiploss_model or TipLoss.PrandtlTipLoss(root_loss=True)
-        self.momentum_model: Momentum.MomentumModel = momentum_model or Momentum.HeckMomentum()
         self.tangential_induction_model = tangential_induction_model or DefaultTangentialInduction()
+        # need to pass in a momentum model from MITRotor - NOT from UMM
+        if momentum_model is not None and not isinstance(momentum_model, Momentum.MomentumModel):
+            raise TypeError(f"Expected MomentumModel from MITRotor or None, got {type(momentum_model).__name__}")
+        self.momentum_model: Momentum.MomentumModel = momentum_model or Momentum.HeckMomentum()
 
         # self._solidity = self.rotor.solidity(self.geometry.mu)
 
