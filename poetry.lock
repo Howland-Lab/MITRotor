@@ -5105,7 +5105,7 @@ figures = ["dualitic @ git+https://github.com/jaimeliew1/Dualitic.git", "ipykern
 type = "git"
 url = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"
 reference = "sg/curled_wave_dev"
-resolved_reference = "0dca2720b444cfc129e325a2e776e7249771e1ba"
+resolved_reference = "67a0d3892230941888d4ab616900eeb9ead41d36"
 
 [[package]]
 name = "uri-template"
