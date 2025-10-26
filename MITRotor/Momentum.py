@@ -35,11 +35,11 @@ class MomentumModel(ABC):
         ...
 
     @abstractmethod
-    def compute_induction(self, Cx: ArrayLike, yaw: float, tilt:float = 0) -> ArrayLike:
+    def compute_induction(self, Cx: ArrayLike, yaw: float = 0, tilt:float = 0) -> ArrayLike:
         ...
 
     @abstractmethod
-    def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
+    def compute_initial_wake_velocities(self, Ct: float, yaw: float = 0, tilt: float = 0.0) -> ArrayLike:
         ...
 
 
@@ -63,7 +63,7 @@ class MomentumModel(ABC):
                     )
         )
 
-        return self.compute_induction(rotor_avg_axial_force, yaw, tilt = tilt)
+        return self.compute_induction(rotor_avg_axial_force, yaw = yaw, tilt = tilt)
 
 
 
@@ -86,7 +86,7 @@ class MomentumModel(ABC):
                     )[:, None] * np.ones(geom.shape)
         
 
-        return self.compute_induction(annulus_avg_axial_force, yaw, tilt = tilt)
+        return self.compute_induction(annulus_avg_axial_force, yaw = yaw, tilt = tilt)
 
     def _func_sector(
         self,
@@ -100,7 +100,7 @@ class MomentumModel(ABC):
     ) -> ArrayLike:
         axial_force = np.clip(aero_props.C_x_corr, 0, 1.69)
 
-        return self.compute_induction(axial_force, yaw, tilt = tilt)
+        return self.compute_induction(axial_force, yaw = yaw, tilt = tilt)
 
     def __call__(
         self,
@@ -122,12 +122,12 @@ class ConstantInduction(MomentumModel):
 
     def compute_induction(self, Cx, yaw, tilt = 0) -> ArrayLike:
         if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+            raise ValueError("Tilt not supported by the ConstantInduction momentum model. Use UMM.")
         return self.a * np.ones_like(yaw)
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
         if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+            raise ValueError("Tilt not supported by the ConstantInduction momentum model. Use UMM.")
         u4 = 1 - 2 * self.a
         v4 = - (1/4) * Ct * np.sin(yaw)
         w4 = 0.0
@@ -148,12 +148,12 @@ class ClassicalMomentum(MomentumModel):
 
     def compute_induction(self, Cx, yaw, tilt = 0):
         if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+            raise ValueError("Tilt not supported by the ClassicalMomentum momentum model. Use UMM.")
         return 0.5 * (1 - np.sqrt(1 - Cx))
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
         if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+            raise ValueError("Tilt not supported by the ClassicalMomentum momentum model. Use UMM.")
         u4 = np.sqrt(1 - Ct)
         v4 = - (1/4) * Ct * np.sin(yaw)
         w4 = 0.0
@@ -185,7 +185,7 @@ class HeckMomentum(MomentumModel):
 
     def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
         if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model for BEM. Use UMM.")
+            raise ValueError("Tilt not supported by the HeckMomentum model for BEM. Use UMM.")
         Ctc = 4 * self.ac * (1 - self.ac) / (1 + 0.25 * (1 - self.ac) ** 2 * np.sin(yaw) ** 2)
         slope = (16 * (1 - self.ac) ** 2 * np.sin(yaw) ** 2 - 128 * self.ac + 64) / (
             (1 - self.ac) ** 2 * np.sin(yaw) ** 2 + 4
@@ -209,7 +209,7 @@ class HeckMomentum(MomentumModel):
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
         if tilt != 0:
-            raise ValueError("Tilt not supported by the Heck momentum model for BEM. Use UMM.")
+            raise ValueError("Tilt not supported by the HeckMomentum model for BEM. Use UMM.")
         a = self.compute_induction(Ct, yaw)
         u4 = 1 - Ct /(2  * (1 - a))
         v4 = - (1/4) * Ct * np.sin(yaw)
