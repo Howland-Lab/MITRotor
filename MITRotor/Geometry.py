@@ -32,7 +32,7 @@ class BEMGeometry:
         Returns the grid point locations in cartesian coordinates
         nondimensionialized by rotor radius. Origin is located at hub center.
 
-        Note: effect of yaw and tilt anglea on grid points is not yet implemented.
+        Note: effect of yaw and tilt angles on grid points is not yet implemented.
         """
         # Probable sign error here.
         X = np.zeros_like(self.mu_mesh)

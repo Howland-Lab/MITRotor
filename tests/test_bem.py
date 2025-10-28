@@ -65,6 +65,3 @@ def test_model_yaw_tilt_comparison():
         assert np.isclose(yaw_sol.Cd(), yaw_tilt_sol.Cd(), atol = atol)
         assert np.isclose(yaw_sol.aoa(), tilt_sol.aoa(), atol = atol)
         assert np.isclose(yaw_sol.aoa(), yaw_tilt_sol.aoa(), atol = atol)
-
-
-test_model_yaw_tilt_comparison()

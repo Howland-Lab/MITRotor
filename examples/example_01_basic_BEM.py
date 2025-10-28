@@ -3,16 +3,6 @@ import numpy as np
 from MITRotor import BEM, IEA10MW, UnifiedMomentum, IEA15MW
 
 if __name__ == "__main__":
-    rotor_model=BEM(IEA15MW(), momentum_model= UnifiedMomentum(averaging = "rotor"))
-    pitch = 0
-    tsr = 7
-    yaw = 0
-    tilt = 0
-    REWS = np.float64(0.9999800001000003)
-    wdir = np.zeros((10, 20))
-    Us = np.ones((10, 20))
-    rotor_model(pitch, tsr, yaw = yaw, tilt = tilt, U = Us / REWS, wdir = wdir)
-
     # Initialize rotor using the IEA10MW reference wind turbine model.
     rotor = IEA10MW()
     bem = BEM(rotor=rotor)
