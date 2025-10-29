@@ -167,6 +167,19 @@ class BEM:
     def sample_points(self, yaw: float = 0.0, tilt: float = 0.0) -> tuple[ArrayLike, ArrayLike, ArrayLike]:
         X, Y, Z = self.geometry.cartesian(yaw, tilt)
         return X, Y, Z
+    
+    def pre_process(self, pitch, tsr, yaw = 0, tilt = 0, **kwargs):
+        # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
+        self.aerodynamic_model.eff_yaw = calc_eff_yaw(yaw, tilt)
+        if tilt == 0:
+            dtheta = 0
+        elif yaw == 0:
+            dtheta = np.pi / 2
+        else: # non-zero yaw and tilt
+            sin_eff = np.sin(self.aerodynamic_model.eff_yaw)
+            dtheta = np.arccos(np.sin(yaw) / sin_eff)
+        self.aerodynamic_model.eff_theta_mesh = self.geometry.theta_mesh + dtheta
+        return
 
     def initial_guess(self, *args, **kwargs) -> Tuple[ArrayLike, ...]:
         a = (1 / 3) * np.ones(self.geometry.shape)

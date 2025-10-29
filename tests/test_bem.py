@@ -16,19 +16,24 @@ def test_default_models():
     rotor = IEA15MW()
     bem = BEM(rotor=rotor)
 
+def test_BEM_pre_process():
+    rotor = IEA15MW()
+    bem = BEM(rotor=rotor)
+    bem.pre_process(0.0, 7.0)
 
 def test_BEM_initial_guess():
     rotor = IEA15MW()
     bem = BEM(rotor=rotor)
+    bem.pre_process(0.0, 7.0)
     bem.initial_guess(0.0, 7.0)
 
 
 def test_BEM_residual():
     rotor = IEA15MW()
     bem = BEM(rotor=rotor)
+    bem.pre_process(0.0, 7.0)
     x0 = bem.initial_guess(0.0, 7.0)
     bem.residual(x0, 0.0, 7, 0)
-
 
 def test_BEM_solve():
     rotor = IEA15MW()

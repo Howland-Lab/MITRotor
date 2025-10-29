@@ -269,15 +269,14 @@ class DefaultAerodynamics(AerodynamicModel):
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
         """
-        local_yaw = -yaw
-        # rotate to a yaw-only frame that includes tilt
-        eff_yaw = calc_eff_yaw(local_yaw, tilt)
-        Vax = U * ((1 - an) * np.cos(eff_yaw))
+        # calculate values in "yaw-only" frame
+        local_yaw = -self.eff_yaw
+        Vax = U * ((1 - an) * np.cos(local_yaw))
         Vtan = (
             (1 + aprime) * tsr * geom.mu_mesh
             - U * (1 - an)
-            * np.cos(geom.theta_mesh)
-            * np.sin(eff_yaw)
+            * np.cos(self.eff_theta_mesh)
+            * np.sin(local_yaw)
         )
 
         phi = np.arctan2(Vax, Vtan)
