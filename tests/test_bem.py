@@ -1,4 +1,4 @@
-from MITRotor import BEM, IEA15MW, UnifiedMomentum
+from MITRotor import BEM, IEA15MW, UnifiedMomentum, BEMGeometry
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 import numpy as np
 from pytest import approx
@@ -70,3 +70,36 @@ def test_model_yaw_tilt_comparison():
         assert np.isclose(yaw_sol.Cd(), yaw_tilt_sol.Cd(), atol = atol)
         assert np.isclose(yaw_sol.aoa(), tilt_sol.aoa(), atol = atol)
         assert np.isclose(yaw_sol.aoa(), yaw_tilt_sol.aoa(), atol = atol)
+
+def test_model_yaw_tilt_rotor_phase():
+    Nr, Ntheta = 20, 40
+    rotor = IEA15MW()
+    bem = BEM(rotor=rotor, momentum_model=UnifiedMomentum(averaging="rotor"), geometry = BEMGeometry(Nr=Nr, Ntheta=Ntheta))
+    # solve BEM for a control set point.
+    yaw = np.deg2rad(20)
+    tilt = yaw
+    misalignment = calc_eff_yaw(yaw, tilt)
+    pitch, tsr = np.deg2rad(0), 7.0
+
+    yaw_sol = bem(pitch, tsr, yaw = misalignment, tilt = 0)
+    tilt_sol = bem(pitch, tsr, yaw = 0, tilt = misalignment)
+    yaw_tilt_sol = bem(pitch, tsr, yaw = yaw, tilt = tilt)
+
+    for idx in range(5, 10):
+        theta_mesh = yaw_sol.geom.theta_mesh[idx, :]
+        yaw_val = yaw_sol.Cn(grid = "sector")[idx, :]
+        tilt_val = tilt_sol.Cn(grid = "sector")[idx, :]
+        yaw_tilt_val = yaw_tilt_sol.Cn(grid = "sector")[idx, :]
+
+        yaw_max_idx = np.argmax(yaw_val)
+        tilt_max_idx = np.argmax(tilt_val)
+        yaw_and_tilt_max_idx = np.argmax(yaw_tilt_val)
+
+        val_atol, deg_atol = 1e-3, 2 * np.pi / Ntheta
+        # all should be at a similar maximum value
+        assert np.isclose(yaw_val[yaw_max_idx], tilt_val[tilt_max_idx], atol = val_atol)
+        assert np.isclose(yaw_val[yaw_max_idx], yaw_tilt_val[yaw_and_tilt_max_idx], atol = val_atol)
+        # tilt and yaw should be offset by 90 degrees
+        assert np.isclose(np.abs(theta_mesh[yaw_max_idx] - theta_mesh[tilt_max_idx]), np.pi / 2, atol = deg_atol)
+        # yaw and evenly split yaw/tilt should be offset by 45 degrees
+        assert np.isclose(np.abs(theta_mesh[yaw_max_idx] - theta_mesh[yaw_and_tilt_max_idx]), np.pi / 4, atol = deg_atol)
