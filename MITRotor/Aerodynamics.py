@@ -8,6 +8,7 @@ from numpy.typing import ArrayLike
 
 from .RotorDefinition import RotorDefinition
 from .Geometry import BEMGeometry
+from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 __all__ = [
     "AerodynamicModel",
@@ -133,6 +134,7 @@ class AerodynamicModel(ABC):
         geom: BEMGeometry,
         U: ArrayLike,
         wdir: ArrayLike,
+        tilt: float = 0,
     ) -> AerodynamicProperties:
         """
         Performs the aerodynamic calculations in a blade-element code.
@@ -147,6 +149,7 @@ class AerodynamicModel(ABC):
             geom (BEMGeometry): Blade element geometry object.
             U (ArrayLike): Inflow velocity on polar grid.
             wdir (ArrayLike): Inflow direction on polar grid.
+            tilt (float): Rotor tilt angle [rad].
 
         Returns:
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
@@ -167,6 +170,7 @@ class KraghAerodynamics(AerodynamicModel):
         geom: BEMGeometry,
         U: ArrayLike,
         wdir: ArrayLike,
+        tilt: float = 0.0,
     ) -> AerodynamicProperties:
         """
         Performs the aerodynamic calculations in a blade-element code using the
@@ -184,11 +188,14 @@ class KraghAerodynamics(AerodynamicModel):
             geom (BEMGeometry): Blade element geometry object.
             U (ArrayLike): Inflow velocity on polar grid.
             wdir (ArrayLike): Inflow direction on polar grid.
+            tilt (float): Rotor tilt angle [rad].
 
         Returns:
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
         """
+        if tilt != 0:
+            raise ValueError("Tilt not supported by the KraghAerodynamics model. Use DefaultAerodynamics.")
         local_yaw = wdir - yaw
 
         Vax = (
@@ -240,6 +247,7 @@ class DefaultAerodynamics(AerodynamicModel):
         geom: BEMGeometry,
         U: ArrayLike,
         wdir: ArrayLike,
+        tilt: float = 0.0,
     ) -> AerodynamicProperties:
         """
         Performs the aerodynamic calculations in a blade-element code using the
@@ -261,13 +269,13 @@ class DefaultAerodynamics(AerodynamicModel):
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
         """
-        local_yaw = -yaw
-
+        # calculate values in "yaw-only" frame
+        local_yaw = -self.eff_yaw
         Vax = U * ((1 - an) * np.cos(local_yaw))
         Vtan = (
             (1 + aprime) * tsr * geom.mu_mesh
             - U * (1 - an)
-            * np.cos(geom.theta_mesh)
+            * np.cos(self.eff_theta_mesh)
             * np.sin(local_yaw)
         )
 
