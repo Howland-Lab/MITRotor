@@ -1,6 +1,6 @@
 import numpy as np
 
-from MITRotor import BEM, IEA10MW, UnifiedMomentum, IEA15MW
+from MITRotor import BEM, IEA10MW
 
 if __name__ == "__main__":
     # Initialize rotor using the IEA10MW reference wind turbine model.
