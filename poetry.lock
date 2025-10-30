@@ -5104,8 +5104,8 @@ figures = ["dualitic @ git+https://github.com/jaimeliew1/Dualitic.git", "ipykern
 [package.source]
 type = "git"
 url = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"
-reference = "sg/curled_wave_dev"
-resolved_reference = "75226c89439f4c57a6f26ac2354493ea33cd8c24"
+reference = "sg/curled_fix_args"
+resolved_reference = "1213cbf41786834b35cbce21fcfb2f5601c41167"
 
 [[package]]
 name = "uri-template"
@@ -5286,4 +5286,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.8"
-content-hash = "2712c9679bfd6da3d38d01cceddf5b9d91371a3410ff496e5a3aab55c518113a"
+content-hash = "a2e008ad6b9a3ba6d17c7c0830aa478c563bd4293fa2ff32f76b16de5a98749a"
