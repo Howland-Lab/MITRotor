@@ -1,40 +1,51 @@
-[tool.poetry]
+[project]
 name = "MITRotor"
 version = "0.2.1"
 description = ""
-authors = ["Jaime Liew <jaimeliew1@gmail.com>"]
+authors = [{ name = "Jaime Liew", email = "jaimeliew1@gmail.com" }]
+requires-python = "~=3.8"
 readme = "README.md"
-packages = [{ include = "MITRotor" }]
+dependencies = [
+    "numpy>=1.16.5",
+    "scipy>=1.6",
+    "unified-momentum-model",
+    "pyyaml>=6.0.1,<7",
+]
 
-[tool.poetry.dependencies]
-python = "^3.8"
-numpy = ">=1.16.5"
-scipy = ">=1.6"
-unified-momentum-model = {git = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"}
-pyyaml = "^6.0.1"
+[dependency-groups]
+dev = [
+    "black[jupyter]>=23.9.1,<24",
+    "ipython>=8,<9",
+    "jupyter>=1.0.0,<2",
+    "mypy>=1.5.1,<2",
+    "pytest>=7.4.2,<8",
+    "ruff>=0.1.7,<0.2",
+    "ipykernel>=6.25.1,<7",
+]
+examples = [
+    "matplotlib>=3.7.3,<4",
+    "polars>=0.19.2,<0.20",
+    "tqdm>=4.66.1,<5",
+]
 
-[tool.poetry.group.dev.dependencies]
-black = { extras = ["jupyter"], version = "^23.9.1" }
-ipython = "^8"
-jupyter = "^1.0.0"
-mypy = "^1.5.1"
-pytest = "^7.4.2"
-ruff = "^0.1.7"
-ipykernel = "^6.25.1"
+[tool.uv]
+default-groups = [
+    "dev",
+    "examples",
+]
 
-[tool.poetry.group.examples]
-optional = true
+[tool.uv.sources]
+unified-momentum-model = { git = "https://github.com/Howland-Lab/Unified-Momentum-Model.git" }
 
-[tool.poetry.group.examples.dependencies]
-matplotlib = "^3.7.3"
-polars = "^0.19.2"
-tqdm = "^4.66.1"
+[tool.hatch.build.targets.sdist]
+include = ["MITRotor"]
 
+[tool.hatch.build.targets.wheel]
+include = ["MITRotor"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.black]
 line-length = 120
