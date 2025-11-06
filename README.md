@@ -27,3 +27,9 @@ then, install locally using pip using `pip install .` for the base installation,
 cd MITRotor
 pip install .
 ```
+
+### Contributing
+The development environment can be created and managed using [uv](https://docs.astral.sh/uv/). To create the environment:
+```bash
+uv sync --extra dev
+```
