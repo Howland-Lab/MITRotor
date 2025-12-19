@@ -122,6 +122,10 @@ class AerodynamicProperties:
 
 
 class AerodynamicModel(ABC):
+    def __init__(self, apply_3D_stall_correction: bool = False):
+        self.apply_3D_stall_correction = apply_3D_stall_correction
+    
+
     @abstractmethod
     def __call__(
         self,
@@ -215,9 +219,9 @@ class KraghAerodynamics(AerodynamicModel):
         aoa = phi - rotor.twist(geom.mu_mesh) - pitch
         aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
 
-        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
-
         solidity = rotor.solidity(geom.mu_mesh)
+
+        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
 
         aero_props = AerodynamicProperties(
             an = an,
@@ -264,6 +268,8 @@ class DefaultAerodynamics(AerodynamicModel):
             geom (BEMGeometry): Blade element geometry object.
             U (ArrayLike): Inflow velocity on polar grid.
             wdir (ArrayLike): Inflow direction on polar grid.
+            tilt (float): Rotor tilt angle [rad].
+            apply_3D_stall_correction (bool): Whether to apply 3D stall correction to angle of attack.
 
         Returns:
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
@@ -283,9 +289,10 @@ class DefaultAerodynamics(AerodynamicModel):
         aoa = phi - rotor.twist(geom.mu_mesh) - pitch
         aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
 
-        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
-
         solidity = rotor.solidity(geom.mu_mesh)
+
+        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa, tsr=tsr, apply_3D_stall_correction=self.apply_3D_stall_correction)
+
 
         aero_props = AerodynamicProperties(
             an = an,

@@ -61,8 +61,60 @@ class BladeAirfoils:
     def Cd(self, x, inflow):
         return self.cd_interp(x, inflow, grid=False)
 
-    def __call__(self, x, inflow):
-        return self.Cl(x, inflow), self.Cd(x, inflow)
+    def __call__(self, x, inflow, tsr=None, apply_3D_stall_correction=False, c_on_r=None):
+        a = 1
+        b = 1
+        d = 1
+        Cl_2D = self.Cl(x, inflow)
+        Cd_2D = self.Cd(x, inflow)
+
+        if apply_3D_stall_correction:
+            # Apply 3D stall correction (Du and Selig 1998)
+
+            # Compute alpha_0 (angle of attack at which Cl=0)
+            aoa_line = np.radians(np.linspace(-10, 10, 100))
+            Clp_line = self.Cl(x, aoa_line)
+            alpha_0 = aoa_line[np.argmin(np.abs(Clp_line))]
+            
+            # Compute slope of Cl curve
+            CL1 = self.Cl(x, np.radians(alpha_0) * np.ones_like(x))
+            CL2 = self.Cl(x, np.radians(5) * np.ones_like(x))
+            m = (CL2 - CL1) / np.radians(5 - alpha_0)
+
+            tsr_mod = 1 / np.sqrt(1 + tsr**2)
+
+            exp1 = np.minimum((d/(tsr_mod * x + 1e-3)), 10)
+            exp2 = np.minimum((d/(2*tsr_mod * x + 1e-3)), 10)
+
+            fl = (
+                (1 / (m)) * 
+                ((1.6 * c_on_r / 0.1267) * 
+                ((a - c_on_r**exp1) / 
+                 (b + c_on_r**exp1)) - 1)
+            )
+            fd = (
+                (1 / (m)) * 
+                ((1.6 * c_on_r / 0.1267) * 
+                ((a - c_on_r**exp2) / 
+                 (b + c_on_r**exp2)) - 1)
+            )
+            # breakpoint()
+
+            Clp = m * (inflow - alpha_0)
+
+            Cd0 = self.Cd(x, alpha_0)
+
+            del_Cl = np.maximum(0, fl * (Clp - Cl_2D))
+            del_Cd = np.maximum(0, fd * (Cd_2D - Cd0))
+
+            Cl_3D = Cl_2D + del_Cl
+            Cd_3D = Cd_2D + del_Cd
+
+            return Cl_3D, Cd_3D
+        
+        else:
+            # No 3D stall correction
+            return Cl_2D, Cd_2D
 
 
 class RotorDefinition:
@@ -153,5 +205,7 @@ class RotorDefinition:
     def solidity(self, mu):
         return self.solidity_func(mu)
 
-    def clcd(self, mu, aoa):
-        return self.airfoil_func(mu, aoa)
+    def clcd(self, mu, aoa, tsr=None, apply_3D_stall_correction=False):
+        solidity = self.solidity(mu)
+        c_on_r = solidity * (2 * np.pi) / (self.N_blades)
+        return self.airfoil_func(mu, aoa, tsr, apply_3D_stall_correction, c_on_r)
