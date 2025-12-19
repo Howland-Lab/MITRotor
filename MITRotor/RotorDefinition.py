@@ -72,14 +72,16 @@ class BladeAirfoils:
             # Apply 3D stall correction (Du and Selig 1998)
 
             # Compute alpha_0 (angle of attack at which Cl=0)
-            aoa_line = np.radians(np.linspace(-10, 10, 100))
-            Clp_line = self.Cl(x, aoa_line)
-            alpha_0 = aoa_line[np.argmin(np.abs(Clp_line))]
+            # aoa_line = np.radians(np.linspace(-10, 10, 100))
+            # Clp_line = self.Cl(x, aoa_line)
+            # alpha_0 = aoa_line[np.argmin(np.abs(Clp_line))]
+            # Clp = 
             
             # Compute slope of Cl curve
-            CL1 = self.Cl(x, np.radians(alpha_0) * np.ones_like(x))
+            CL1 = self.Cl(x, np.radians(0) * np.ones_like(x))
             CL2 = self.Cl(x, np.radians(5) * np.ones_like(x))
-            m = (CL2 - CL1) / np.radians(5 - alpha_0)
+            m = (CL2 - CL1) / np.radians(5 - 0)
+            alpha_0 = -CL1 / m
 
             tsr_mod = 1 / np.sqrt(1 + tsr**2)
 
