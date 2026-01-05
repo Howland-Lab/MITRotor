@@ -1,16 +1,25 @@
 import numpy as np
+import os
 from attrs import define, field
 from typing import Literal, Optional
 from scipy.interpolate import interp1d
 # FLORIS Imports
 from floris.type_dec import floris_float_type, NDArrayFloat
 from floris.core.turbine.operation_models import BaseOperationModel
-from floris.core.rotor_velocity import average_velocity
-# MITRotor Imports
+from floris.core.rotor_velocity import average_velocity, rotor_velocity_air_density_correction
+# MITRotor / UMM Imports
 from MITRotor.ReferenceTurbines import IEA15MW
 from MITRotor.Momentum import UnifiedMomentum
 from MITRotor.Geometry import BEMGeometry
-from MITRotor.BEMSolver import BEM, BEMSolution
+from MITRotor.BEMSolver import BEM
+from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
+
+def default_bem_factory():
+    return BEM(
+        rotor=IEA15MW(),
+        momentum_model=UnifiedMomentum(averaging="rotor"),
+        geometry=BEMGeometry(Nr=10, Ntheta=20),
+    )
 
 def csv_to_interp(csv_file):
     # read in csv
@@ -23,7 +32,7 @@ def csv_to_interp(csv_file):
     x = x[idx]
     y = y[idx]
     # return interpolator for y
-    return interp1d(x, y, kind="linear", bounds_error=False, fill_value="extrapolate")
+    return interp1d(x, y, kind="linear", fill_value=0.0001, bounds_error=False)
 
 @define
 class MITRotorTurbine(BaseOperationModel):
@@ -31,71 +40,100 @@ class MITRotorTurbine(BaseOperationModel):
     A turbine operation model that calls MITRotor.
     """
     # user can define a BEM model if they want a different rotor, momentum model, or geometry
-    default_bem = BEM(
-        rotor=IEA15MW(),
-        momentum_model = UnifiedMomentum(averaging = "rotor"),
-        geometry = BEMGeometry(Nr = 10, Ntheta = 20),
-    )
-    bem_model = field(init = False, default = default_bem, type = BEM)
+    bem_model = field(init = True, factory = default_bem_factory, type = BEM)
     # save most recent solution by unique floris arguments
-    _bem_sol = field(init=False, default=None, type = Optional[list[BEMSolution]])
-    _avg_vels = field(init=False, default=None, type = Optional[NDArrayFloat])
     _last_key = field(init=False, default=None, type = bytes)
-    # save blade pitch and tsr interpolation objects
-    # TODO -> figure out how to make csv change with rotor type
-    _pitch_interp = field(init = False, default = csv_to_interp("pitch_15mw.csv"))
-    _tsr_interp = field(init = False, default= csv_to_interp("tsr_15mw.csv"))
+    _a = field(init=False, default=None, type = NDArrayFloat)
+    _Ct = field(init=False, default=None, type = NDArrayFloat)
+    _power = field(init=False, default=None, type = NDArrayFloat)
+    # user can define csv paths for pitch and tsr values
+    module_dir = os.path.dirname(__file__)
+    default_pitch_csv = os.path.join(module_dir, "pitch_15mw.csv")
+    default_tsr_csv = os.path.join(module_dir, "tsr_15mw.csv")
+    pitch_csv = field(init = True, default = default_pitch_csv, type = str)
+    tsr_csv = field(init = True, default= default_tsr_csv, type = str)
+    # create interp objects based on pitch and tsr csvs
+    _pitch_interp = field(init=False, default=None, type = interp1d, repr = False)
+    _tsr_interp = field(init=False, default=None, type = interp1d, repr = False)
 
-    def _get_solution_key(self, velocities: np.ndarray) -> bytes: # TODO: add more inputs
+    def __attrs_post_init__(self):
+        self._pitch_interp = csv_to_interp(self.pitch_csv)
+        self._tsr_interp = csv_to_interp(self.tsr_csv)
+
+    def _get_state_key(self, velocities: np.ndarray, yaw_angles: np.ndarray, tilt_angles: np.ndarray) -> tuple:
         # Fast, deterministic, and explicit
-        return velocities.tobytes()
+        return velocities.tobytes(), yaw_angles.tobytes(), tilt_angles.tobytes()
 
-    def _get_solutions(self,
+    def _update_solution(self,
+        power_thrust_table: dict,
         velocities: NDArrayFloat,
+        air_density: float,
         yaw_angles: NDArrayFloat,
         tilt_angles: NDArrayFloat,
+        average_method: str = "cubic-mean",
+        cubature_weights: NDArrayFloat | None = None,
+        **kwargs,
     ):
         n_findex, n_turbines = yaw_angles.shape
         # create cache key for current inputs
-        key = self._get_solution_key(velocities) # TODO: add more inputs
+        key = self._get_state_key(velocities, yaw_angles, tilt_angles) # TODO: add more inputs
         # update solution if conditions are different
         if key != self._last_key:
-            self._bem_sol = [None] * n_findex
-            self._avg_vels = np.empty((n_findex, n_turbines), dtype=velocities.dtype)
+            # save new key and clear fields
             self._last_key = key
+            self._a = np.empty((n_findex, n_turbines), dtype=floris_float_type)
+            self._Ct = np.empty((n_findex, n_turbines), dtype=floris_float_type)
+            self._power = np.empty((n_findex, n_turbines), dtype=floris_float_type)
+
+            # compute the power-effective wind speed across the rotor
+            rotor_average_velocities = average_velocity(
+                velocities=velocities,
+                method=average_method,
+                cubature_weights=cubature_weights,
+            )
+            # update effective velocities for air density
+            rotor_effective_velocities = rotor_velocity_air_density_correction(
+                velocities=rotor_average_velocities,
+                air_density=air_density,
+                ref_air_density=power_thrust_table["ref_air_density"]
+            )
             # loop over flow conditions
             for findex in range(n_findex):
-                cond_vels, cond_yaws, cond_tilts = velocities[findex], yaw_angles[findex], tilt_angles[findex]
-                rotor_avg_vels = average_velocity(cond_vels, method="cubic-mean") # TODO: does method need to be user input?
-                pitch_vals = self._pitch_interp(rotor_avg_vels)
-                tsr_vals = self._tsr_interp(rotor_avg_vels)
-                self._bem_sol[findex] = self.bem_model(pitch_vals, tsr_vals, yaw = cond_yaws, tilt = cond_tilts)
-                self._avg_vels[findex] = rotor_avg_vels
+                for tindex in range(n_turbines):
+                    vel = rotor_effective_velocities[findex, tindex]
+                    yaw, tilt = np.deg2rad(yaw_angles[findex, tindex]), np.deg2rad(tilt_angles[findex, tindex])
+                    pitch_val = np.deg2rad(self._pitch_interp(vel))
+                    tsr_val = self._tsr_interp(vel)
+                    bem_sol = self.bem_model(pitch_val, tsr_val, yaw = yaw, tilt = tilt)
+                    self._a[findex, tindex] = bem_sol.a()
+                    self._Ct[findex, tindex] = bem_sol.Ct()
+                    # calculate power
+                    rotor_area = np.pi * self.bem_model.rotor.R**2 
+                    rotor_uinfty = vel * np.cos(calc_eff_yaw(yaw, tilt))
 
-        return self._bem_sol
+                                        # Construct power interpolant
+                    power_interpolator = interp1d(
+                        power_thrust_table["wind_speed"],
+                        power_thrust_table["power"],
+                        fill_value=0.0,
+                        bounds_error=False,
+                    )
+
+                    # Compute power
+                    power = power_interpolator(rotor_uinfty) * 1e3 # --> I am not sure the rotor_uinfty is the right value...
+                    self._power[findex, tindex] = power # it seems like using Cp (below) should be correct... plot power interpolator...
+                    # self._power[findex, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (rotor_uinfty)**3
+
+        return
     
-    def power(self,
-        velocities: NDArrayFloat,
-        yaw_angles: NDArrayFloat,
-        tilt_angles: NDArrayFloat,
-        **_
-    ) -> NDArrayFloat:
-        return self._get_solutions(velocities, yaw_angles, tilt_angles).Cp() # TODO: what type of averaging do we want? AND make into POWER
+    def power(self, **kwargs) -> NDArrayFloat:
+        self._update_solution(**kwargs)
+        return self._power
 
+    def thrust_coefficient(self, **kwargs) -> NDArrayFloat:
+        self._update_solution(**kwargs)
+        return self._Ct
 
-    def thrust_coefficient(self,
-        velocities: NDArrayFloat,
-        yaw_angles: NDArrayFloat,
-        tilt_angles: NDArrayFloat,
-        **_
-    ) -> NDArrayFloat:
-        return self._get_solutions(velocities, yaw_angles, tilt_angles).Ct() # TODO: what type of averaging do we want?
-
-
-    def axial_induction(self,
-        velocities: NDArrayFloat,
-        yaw_angles: NDArrayFloat,
-        tilt_angles: NDArrayFloat,
-        **_
-    ) -> NDArrayFloat:
-        return self._get_solutions(velocities, yaw_angles, tilt_angles).a() # TODO: what type of averaging do we want?
+    def axial_induction(self, **kwargs) -> NDArrayFloat:
+        self._update_solution(**kwargs)
+        return self._a
