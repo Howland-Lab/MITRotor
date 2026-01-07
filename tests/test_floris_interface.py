@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from importlib.resources import files
+import os
 from numpy.testing import assert_almost_equal, assert_allclose
 from floris import FlorisModel, TimeSeries
 from MITRotor.FlorisInterface import FlorisInterface
@@ -10,10 +10,12 @@ from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, csv_to_int
 
 def test_pitch_tsr_interpolation():
     # get 15MW CSV file paths
-    pitch_csv = files("MITRotor.FlorisInterface") / "pitch_15mw.csv"
-    tsr_csv   = files("MITRotor.FlorisInterface") / "tsr_15mw.csv"
-    pitch_csv = str(pitch_csv)
-    tsr_csv = str(tsr_csv)
+    module_dir = os.path.dirname(__file__)  # tests/
+    pitch_csv = os.path.join(module_dir, "..", "MITRotor", "FlorisInterface", "pitch_15mw.csv")
+    tsr_csv   = os.path.join(module_dir, "..", "MITRotor", "FlorisInterface", "tsr_15mw.csv")
+    pitch_csv = os.path.abspath(pitch_csv)
+    tsr_csv   = os.path.abspath(tsr_csv)
+
     # create interpolators
     tsr_interp = csv_to_interp(tsr_csv)
     pitch_interp = csv_to_interp(pitch_csv)
