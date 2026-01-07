@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from attrs import define, field
-from typing import Literal, Optional
+from typing import Optional
 from scipy.interpolate import interp1d
 # FLORIS Imports
 from floris.type_dec import floris_float_type, NDArrayFloat
@@ -78,7 +78,7 @@ class MITRotorTurbine(BaseOperationModel):
         yaw_angles: NDArrayFloat,
         tilt_angles: NDArrayFloat,
         average_method: str = "cubic-mean",
-        cubature_weights: NDArrayFloat | None = None,
+        cubature_weights: Optional[NDArrayFloat] = None,
         **_,
     ):
         # create cache key for current inputs
