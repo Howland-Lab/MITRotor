@@ -21,6 +21,14 @@ def default_bem_factory():
         geometry=BEMGeometry(Nr=10, Ntheta=20),
     )
 
+def default_pitch_csv():
+    module_dir = os.path.dirname(__file__)
+    return os.path.join(module_dir, "pitch_15mw.csv")
+
+def default_tsr_csv():
+    module_dir = os.path.dirname(__file__)
+    return os.path.join(module_dir, "tsr_15mw.csv")
+
 def csv_to_interp(csv_file):
     # read in csv
     data = np.loadtxt(csv_file, delimiter=",", skiprows=1)
@@ -32,7 +40,7 @@ def csv_to_interp(csv_file):
     x = x[idx]
     y = y[idx]
     # return interpolator for y
-    return interp1d(x, y, kind="linear", fill_value=0.0001, bounds_error=False)
+    return interp1d(x, y, kind="linear", fill_value="extrapolate", bounds_error=False)
 
 @define
 class MITRotorTurbine(BaseOperationModel):
@@ -41,20 +49,20 @@ class MITRotorTurbine(BaseOperationModel):
     """
     # user can define a BEM model if they want a different rotor, momentum model, or geometry
     bem_model = field(init = True, factory = default_bem_factory, type = BEM)
+
+    # user can define csv paths for pitch and tsr values
+    pitch_csv = field(init = True, factory = default_pitch_csv, type = str)
+    tsr_csv = field(init = True, factory = default_tsr_csv, type = str)
+
+    # create interp objects based on pitch and tsr csvs
+    _pitch_interp = field(init=False, default=None, type = interp1d, repr = False)
+    _tsr_interp = field(init=False, default=None, type = interp1d, repr = False)
+
     # save most recent solution by unique floris arguments
     _last_key = field(init=False, default=None, type = bytes)
     _a = field(init=False, default=None, type = NDArrayFloat)
     _Ct = field(init=False, default=None, type = NDArrayFloat)
     _power = field(init=False, default=None, type = NDArrayFloat)
-    # user can define csv paths for pitch and tsr values
-    module_dir = os.path.dirname(__file__)
-    default_pitch_csv = os.path.join(module_dir, "pitch_15mw.csv")
-    default_tsr_csv = os.path.join(module_dir, "tsr_15mw.csv")
-    pitch_csv = field(init = True, default = default_pitch_csv, type = str)
-    tsr_csv = field(init = True, default= default_tsr_csv, type = str)
-    # create interp objects based on pitch and tsr csvs
-    _pitch_interp = field(init=False, default=None, type = interp1d, repr = False)
-    _tsr_interp = field(init=False, default=None, type = interp1d, repr = False)
 
     def __attrs_post_init__(self):
         self._pitch_interp = csv_to_interp(self.pitch_csv)
@@ -65,20 +73,20 @@ class MITRotorTurbine(BaseOperationModel):
         return velocities.tobytes(), yaw_angles.tobytes(), tilt_angles.tobytes()
 
     def _update_solution(self,
-        power_thrust_table: dict,
         velocities: NDArrayFloat,
         air_density: float,
         yaw_angles: NDArrayFloat,
         tilt_angles: NDArrayFloat,
         average_method: str = "cubic-mean",
         cubature_weights: NDArrayFloat | None = None,
-        **kwargs,
+        **_,
     ):
-        n_findex, n_turbines = yaw_angles.shape
         # create cache key for current inputs
         key = self._get_state_key(velocities, yaw_angles, tilt_angles) # TODO: add more inputs
         # update solution if conditions are different
         if key != self._last_key:
+            n_findex, n_turbines = yaw_angles.shape
+
             # save new key and clear fields
             self._last_key = key
             self._a = np.empty((n_findex, n_turbines), dtype=floris_float_type)
@@ -91,39 +99,23 @@ class MITRotorTurbine(BaseOperationModel):
                 method=average_method,
                 cubature_weights=cubature_weights,
             )
-            # update effective velocities for air density
-            rotor_effective_velocities = rotor_velocity_air_density_correction(
-                velocities=rotor_average_velocities,
-                air_density=air_density,
-                ref_air_density=power_thrust_table["ref_air_density"]
-            )
+            # calculate rotor area
+            rotor_area = np.pi * self.bem_model.rotor.R**2 
             # loop over flow conditions
             for findex in range(n_findex):
                 for tindex in range(n_turbines):
-                    vel = rotor_effective_velocities[findex, tindex]
+                    # get setpoints
+                    vel = rotor_average_velocities[findex, tindex]
                     yaw, tilt = np.deg2rad(yaw_angles[findex, tindex]), np.deg2rad(tilt_angles[findex, tindex])
-                    pitch_val = np.deg2rad(self._pitch_interp(vel))
-                    tsr_val = self._tsr_interp(vel)
-                    bem_sol = self.bem_model(pitch_val, tsr_val, yaw = yaw, tilt = tilt)
+                    pitch = np.deg2rad(self._pitch_interp(vel))
+                    tsr = self._tsr_interp(vel)
+                    # solve BEM
+                    bem_sol = self.bem_model(pitch, tsr, yaw = yaw, tilt = tilt)
+                    # get induction and thrust coeff
                     self._a[findex, tindex] = bem_sol.a()
                     self._Ct[findex, tindex] = bem_sol.Ct()
-                    # calculate power
-                    rotor_area = np.pi * self.bem_model.rotor.R**2 
-                    rotor_uinfty = vel * np.cos(calc_eff_yaw(yaw, tilt))
-
-                                        # Construct power interpolant
-                    power_interpolator = interp1d(
-                        power_thrust_table["wind_speed"],
-                        power_thrust_table["power"],
-                        fill_value=0.0,
-                        bounds_error=False,
-                    )
-
-                    # Compute power
-                    power = power_interpolator(rotor_uinfty) * 1e3 # --> I am not sure the rotor_uinfty is the right value...
-                    self._power[findex, tindex] = power # it seems like using Cp (below) should be correct... plot power interpolator...
-                    # self._power[findex, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (rotor_uinfty)**3
-
+                    # compute power
+                    self._power[findex, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (vel)**3
         return
     
     def power(self, **kwargs) -> NDArrayFloat:

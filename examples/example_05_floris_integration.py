@@ -1,10 +1,8 @@
-from MITRotor.FlorisInterface.FlorisInterface import csv_to_interp, MITRotorTurbine
-from floris import FlorisModel, TimeSeries
-from floris.core.turbine.unified_momentum_model import UnifiedMomentumModelTurbine
 import numpy as np
-import matplotlib.pyplot as plt
-
 from floris import FlorisModel, TimeSeries
+from MITRotor.FlorisInterface.FlorisInterface import csv_to_interp, MITRotorTurbine
+from floris.core.turbine.unified_momentum_model import UnifiedMomentumModelTurbine
+
 
 fmodel = FlorisModel("defaults")
 time_series = TimeSeries(
@@ -25,9 +23,6 @@ fmodel.set(
     yaw_angles = yaw_angles
 )
 fmodel.set_operation_model(UnifiedMomentumModelTurbine)
-
-# fmodel.set_operation_model(MITRotorTurbine())
-
 fmodel.run()
 
 print("Powers [W]:\n", fmodel.get_turbine_powers(), "\n")
