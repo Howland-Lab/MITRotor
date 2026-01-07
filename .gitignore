@@ -1,7 +1,6 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 
-
 fig
 fig*
 *.mat
@@ -13,6 +12,10 @@ fig*
 *.png
 *.tar
 *.whl
+
+# Allow these CSVs needed for the floris interface
+!MITRotor/FlorisInterface/pitch_15mw.csv
+!MITRotor/FlorisInterface/tsr_15mw.csv
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
