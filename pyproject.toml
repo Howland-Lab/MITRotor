@@ -31,14 +31,14 @@ matplotlib = "^3.7.3"
 polars = "^0.19.2"
 tqdm = "^4.66.1"
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
 
 [tool.black]
 line-length = 120
 
 [tool.ruff]
 line-length = 120
+
+include = ["MITRotor/FlorisInterface/*.csv"]
