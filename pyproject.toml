@@ -7,11 +7,12 @@ readme = "README.md"
 packages = [{ include = "MITRotor" }]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 numpy = ">=1.16.5"
 scipy = ">=1.6"
 unified-momentum-model = {git = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"}
 pyyaml = "^6.0.1"
+floris = {git = "https://github.com/misi9170/floris.git", branch = "feature/user-def-op-mod"}
 
 [tool.poetry.group.dev.dependencies]
 black = { extras = ["jupyter"], version = "^23.9.1" }
@@ -30,14 +31,14 @@ matplotlib = "^3.7.3"
 polars = "^0.19.2"
 tqdm = "^4.66.1"
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
 
 [tool.black]
 line-length = 120
 
 [tool.ruff]
 line-length = 120
+
+include = ["MITRotor/FlorisInterface/*.csv"]
