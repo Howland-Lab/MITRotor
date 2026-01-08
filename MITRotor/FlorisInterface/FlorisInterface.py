@@ -49,7 +49,17 @@ def csv_to_interp(csv_file):
 @define
 class MITRotorTurbine(BaseOperationModel):
     """
-    A turbine operation model that calls MITRotor.
+    Turbine operation model as described by Liew et al. (2024).
+
+    Args:
+        bem_model (BEM): optional BEM model as defined in MITRotor, defaults to IEA15MW with UMM momentum model
+        pitch_csv (str): optional path to pitch trajectory based on wind speed, defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
+        tsr_csv (str)): optional path to tsr trajectory based on wind speed, defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
+
+    Methods:
+        power
+        thrust_coefficient
+        axial_induction
     """
     # user can define a BEM model if they want a different rotor, momentum model, or geometry
     bem_model = field(init = True, factory = default_bem_factory, type = BEM)
