@@ -14,17 +14,21 @@ from MITRotor.Geometry import BEMGeometry
 from MITRotor.BEMSolver import BEM
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
+# default rotor if none provided by user (IEA 15MW)
 def default_bem_factory():
     return BEM(
         rotor=IEA15MW(),
         momentum_model=UnifiedMomentum(averaging="rotor"),
         geometry=BEMGeometry(Nr=10, Ntheta=20),
     )
-
+# pitch vs windspeed curve if none provided by user
+# for IEA 15MW from figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
 def default_pitch_csv():
     module_dir = os.path.dirname(__file__)
     return os.path.join(module_dir, "pitch_15mw.csv")
 
+# tsr vs windspeed curve if none provided by user
+# for IEA 15MW from figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
 def default_tsr_csv():
     module_dir = os.path.dirname(__file__)
     return os.path.join(module_dir, "tsr_15mw.csv")
@@ -40,7 +44,7 @@ def csv_to_interp(csv_file):
     x = x[idx]
     y = y[idx]
     # return interpolator for y
-    return interp1d(x, y, kind="linear", fill_value="extrapolate", bounds_error=False)
+    return interp1d(x, y, kind="linear", fill_value="extrapolate", bounds_error=False) # TODO: should fill_value be extrapolate?
 
 @define
 class MITRotorTurbine(BaseOperationModel):
@@ -65,11 +69,12 @@ class MITRotorTurbine(BaseOperationModel):
     _power = field(init=False, default=None, type = NDArrayFloat)
 
     def __attrs_post_init__(self):
+        # creates interpolation objects
         self._pitch_interp = csv_to_interp(self.pitch_csv)
         self._tsr_interp = csv_to_interp(self.tsr_csv)
 
     def _get_state_key(self, velocities: np.ndarray, yaw_angles: np.ndarray, tilt_angles: np.ndarray) -> tuple:
-        # Fast, deterministic, and explicit
+        # saves key to uniquely identify farm state -> avoids re-solving for calls to power, thrust, and induction for same state
         return velocities.tobytes(), yaw_angles.tobytes(), tilt_angles.tobytes()
 
     def _update_solution(self,
@@ -82,7 +87,7 @@ class MITRotorTurbine(BaseOperationModel):
         **_,
     ):
         # create cache key for current inputs
-        key = self._get_state_key(velocities, yaw_angles, tilt_angles) # TODO: add more inputs
+        key = self._get_state_key(velocities, yaw_angles, tilt_angles)
         # update solution if conditions are different
         if key != self._last_key:
             n_findex, n_turbines = yaw_angles.shape
@@ -99,9 +104,11 @@ class MITRotorTurbine(BaseOperationModel):
                 method=average_method,
                 cubature_weights=cubature_weights,
             )
+
             # calculate rotor area
             rotor_area = np.pi * self.bem_model.rotor.R**2 
-            # loop over flow conditions
+
+            # loop over flow conditions -> TODO: should this be vectorized?
             for findex in range(n_findex):
                 for tindex in range(n_turbines):
                     # get setpoints
