@@ -1,34 +1,29 @@
+import os
 import numpy as np
 import pytest
-import os
+import polars as pl
 from numpy.testing import assert_almost_equal, assert_allclose
 from floris import FlorisModel, TimeSeries
-from MITRotor.FlorisInterface import FlorisInterface
-from MITRotor.FlorisInterface.FlorisInterface import default_bem_factory, default_pitch_csv, default_tsr_csv
-from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, csv_to_interp
+from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, default_bem_factory, default_pitch_interp, default_tsr_interp
 
 
 def test_pitch_tsr_interpolation():
-    # get 15MW CSV file paths
-    module_dir = os.path.dirname(__file__)  # tests/
-    pitch_csv = os.path.join(module_dir, "..", "MITRotor", "FlorisInterface", "pitch_15mw.csv")
-    tsr_csv   = os.path.join(module_dir, "..", "MITRotor", "FlorisInterface", "tsr_15mw.csv")
-    pitch_csv = os.path.abspath(pitch_csv)
-    tsr_csv   = os.path.abspath(tsr_csv)
-
-    # create interpolators
-    tsr_interp = csv_to_interp(tsr_csv)
-    pitch_interp = csv_to_interp(pitch_csv)
+    # create default interpolators
+    tsr_interp = default_tsr_interp()
+    pitch_interp = default_pitch_interp()
 
     # load raw CSV data
-    tsr_data = np.loadtxt(tsr_csv, delimiter=",", skiprows=1)
-    pitch_data = np.loadtxt(pitch_csv, delimiter=",", skiprows=1)
-    tsr_ws, tsr_vals = tsr_data[:, 0], tsr_data[:, 1]
-    pitch_ws, pitch_vals = pitch_data[:, 0], pitch_data[:, 1]
+    module_dir = os.path.dirname(__file__)  # tests/
+    validation_csv = os.path.abspath(os.path.join(module_dir, "..", "MITRotor", "FlorisInterface", "IEA_15mw_rotor.csv"))
+    df = pl.read_csv(validation_csv)
+    wind_data = df["Wind [m/s]"].to_numpy()
+    pitch_data = df["Pitch [deg]"].to_numpy()
+    tip_speed_data = df["Tip Speed [m/s]"].to_numpy()
+    tsr_data = tip_speed_data / wind_data
 
     # interpolator reproduces raw data
-    assert_allclose(tsr_interp(tsr_ws), tsr_vals, rtol=1e-12, atol=1e-12)
-    assert_allclose(pitch_interp(pitch_ws), pitch_vals, rtol=1e-12, atol=1e-12)
+    assert_allclose(tsr_interp(wind_data), tsr_data, rtol=1e-12, atol=1e-12)
+    assert_allclose(pitch_interp(wind_data), pitch_data, rtol=1e-12, atol=1e-12)
 
     # reasonable values
     x_interp_vals = np.linspace(0.0, 25.0, 100)
@@ -44,8 +39,8 @@ def test_pitch_tsr_interpolation():
 # compute MITRotor BEM outputs directly
 def compute_mitrotor_cp_ct_a(wind_speeds, yaw_deg = 0.0, tilt_deg = 0.0):
     bem_model = default_bem_factory() # default BEM (IEA15MW) used in floris interface
-    pitch_interp = csv_to_interp(default_pitch_csv()) # IEA15MW pitch curve
-    tsr_interp = csv_to_interp(default_tsr_csv()) # IEA15MW tsr curve
+    pitch_interp = default_pitch_interp() # IEA15MW pitch curve
+    tsr_interp = default_tsr_interp() # IEA15MW tsr curve
 
     n = len(wind_speeds)
     Ct = np.empty(n)
