@@ -78,13 +78,19 @@ class MomentumModel(ABC):
         tilt: float = 0.0,
     ) -> ArrayLike:
         
-        annulus_avg_axial_force = (
+        # annulus_avg_axial_force = (
             
+        #         geom.annulus_average(
+        #             np.clip(aero_props.C_x_corr, 0, 1.69)
+        #             )
+        #             )[:, None] * np.ones(geom.shape)
+        
+        
+        annulus_avg_axial_force = (
                 geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, 0, 1.69)
+                    aero_props.Ctprime_corr
                     )
                     )[:, None] * np.ones(geom.shape)
-        
 
         return self.compute_induction(annulus_avg_axial_force, yaw = yaw, tilt = tilt)
 

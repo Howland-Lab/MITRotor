@@ -45,6 +45,7 @@ class AerodynamicProperties:
         Cax: Blade element axial force coefficient.
     """
 
+    local_yaw: float = None
     # Radial grid
     an: ArrayLike
     aprime: ArrayLike
@@ -117,6 +118,20 @@ class AerodynamicProperties:
         Corrected blade element area tangential force coefficient.
         """
         return self.C_tau / self.F
+    
+    @cached_property
+    def Ctprime(self):
+        """
+        Local thrust coefficient
+        """
+        return self.C_x / (1 - self.an)**2 / np.cos(calc_eff_yaw(self.local_yaw))**2
+    
+    @cached_property
+    def Ctprime_corr(self):
+        """
+        Corrected local thrust coefficient
+        """
+        return self.Ctprime / self.F
 
 
 
@@ -305,6 +320,7 @@ class DefaultAerodynamics(AerodynamicModel):
             aoa = aoa,
             Cl = Cl,
             Cd = Cd,
+            local_yaw = local_yaw,
         )
 
         return aero_props
