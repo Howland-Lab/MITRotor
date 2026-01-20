@@ -45,7 +45,6 @@ class AerodynamicProperties:
         Cax: Blade element axial force coefficient.
     """
 
-    local_yaw: float = None
     # Radial grid
     an: ArrayLike
     aprime: ArrayLike
@@ -59,6 +58,7 @@ class AerodynamicProperties:
     Cl: ArrayLike
     Cd: ArrayLike
     F: ArrayLike = None
+    yaw_eff: float = None
 
     def __post_init__(self):
         pass
@@ -320,7 +320,7 @@ class DefaultAerodynamics(AerodynamicModel):
             aoa = aoa,
             Cl = Cl,
             Cd = Cd,
-            local_yaw = local_yaw,
+            yaw_eff = self.yaw_eff,
         )
 
         return aero_props
