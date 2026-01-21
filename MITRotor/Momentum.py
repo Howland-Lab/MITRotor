@@ -269,8 +269,8 @@ class MadsenMomentum(MomentumModel):
 
 
     def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+        # if tilt != 0:
+            # raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         if self.cosine_exponent:
             Ct = Cx / (np.cos(yaw)**2)
         else:
@@ -280,8 +280,8 @@ class MadsenMomentum(MomentumModel):
         return an
 
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+        # if tilt != 0:
+        #     raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         u4 = np.sqrt(1 - Ct)
         v4 = - (1/4) * Ct * np.sin(yaw)
         w4 = 0.0

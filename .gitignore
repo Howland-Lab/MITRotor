@@ -1,7 +1,6 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 
-
 fig
 fig*
 *.mat
@@ -13,6 +12,11 @@ fig*
 *.png
 *.tar
 *.whl
+
+# Allow these CSVs needed for the floris interface
+!MITRotor/FlorisInterface/IEA_15mw_rotor.csv
+
+Validation/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -188,3 +192,5 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+.DS_Store
