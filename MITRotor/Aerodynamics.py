@@ -271,16 +271,17 @@ class DefaultAerodynamics(AerodynamicModel):
         """
         # calculate values in "yaw-only" frame
         local_yaw = -self.eff_yaw
-        Vax = U * ((1 - an) * np.cos(local_yaw))
+        Vax = U * ((1 - an[None, :, :]) * np.cos(local_yaw[:, None, None]))
+        theta_eff = geom.theta_mesh[None, :, :] + self.delta_theta[:, None, None]
         Vtan = (
-            (1 + aprime) * tsr * geom.mu_mesh
-            - U * (1 - an)
-            * np.cos(self.eff_theta_mesh)
-            * np.sin(local_yaw)
+            (1 + aprime[None, :, :]) * tsr[:, None, None] * geom.mu_mesh[None, :, :]
+            - U * (1 - an[None, :, :])
+            * np.cos(theta_eff)
+            * np.sin(local_yaw[:, None, None])
         )
 
         phi = np.arctan2(Vax, Vtan)
-        aoa = phi - rotor.twist(geom.mu_mesh) - pitch
+        aoa = phi - rotor.twist(geom.mu_mesh) - pitch[:, None, None]
         aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
 
         Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)

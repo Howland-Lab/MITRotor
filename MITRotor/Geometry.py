@@ -51,3 +51,11 @@ class BEMGeometry:
 
         X_rotor = 2 * np.trapezoid(X * self.mu, self.mu)
         return X_rotor
+    
+    def op(x):
+        """Operating-point axis"""
+        return x[:, None, None]
+
+    def mesh(x):
+        """Geometry mesh axis"""
+        return x[None, :, :]

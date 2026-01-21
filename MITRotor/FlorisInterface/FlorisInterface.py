@@ -110,20 +110,18 @@ class MITRotorTurbine(BaseOperationModel):
             rotor_area = np.pi * self.bem_model.rotor.R**2 
 
             # loop over flow conditions -> TODO: should this be vectorized?
-            for findex in range(n_findex):
-                for tindex in range(n_turbines):
-                    # get setpoints
-                    vel = rotor_average_velocities[findex, tindex]
-                    yaw, tilt = np.deg2rad(yaw_angles[findex, tindex]), np.deg2rad(tilt_angles[findex, tindex])
-                    pitch = np.deg2rad(self.pitch_interp(vel))
-                    tsr = self.tsr_interp(vel)
-                    # solve BEM
-                    bem_sol = self.bem_model(pitch, tsr, yaw = yaw, tilt = tilt)
-                    # get induction and thrust coeff
-                    self._a[findex, tindex] = bem_sol.a()
-                    self._Ct[findex, tindex] = bem_sol.Ct()
-                    # compute power
-                    self._power[findex, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (vel)**3
+            # get setpoints
+            yaw, tilt = np.deg2rad(yaw_angles), np.deg2rad(tilt_angles)
+            pitch = np.deg2rad(self.pitch_interp(rotor_average_velocities))
+            tsr = self.tsr_interp(rotor_average_velocities)
+            for tindex in range(n_turbines):
+                # solve BEM
+                bem_sol = self.bem_model(pitch[:, tindex], tsr[:, tindex], yaw = yaw[:, tindex], tilt = tilt[:, tindex])
+                # get induction and thrust coeff
+                self._a[:, tindex] = bem_sol.a()
+                self._Ct[:, tindex] = bem_sol.Ct()
+                # compute power
+                self._power[:, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (rotor_average_velocities[:, tindex])**3
         return
     
     def power(self, **kwargs) -> NDArrayFloat:
