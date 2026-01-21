@@ -7,20 +7,19 @@ from scipy.interpolate import interp1d
 # FLORIS Imports
 from floris.type_dec import floris_float_type, NDArrayFloat
 from floris.core.turbine.operation_models import BaseOperationModel
-from floris.core.rotor_velocity import average_velocity, rotor_velocity_air_density_correction
+from floris.core.rotor_velocity import average_velocity
 # MITRotor / UMM Imports
 from MITRotor.ReferenceTurbines import IEA15MW
-from MITRotor.Momentum import MadsenMomentum
+from MITRotor.Momentum import UnifiedMomentum
 from MITRotor.Geometry import BEMGeometry
 from MITRotor.TipLoss import NoTipLoss
 from MITRotor.BEMSolver import BEM
-from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 # default rotor if none provided by user (IEA 15MW)
 def default_bem_factory():
     return BEM(
         rotor=IEA15MW(),
-        momentum_model=MadsenMomentum(averaging="annulus"),
+        momentum_model=UnifiedMomentum(averaging="rotor"),
         geometry=BEMGeometry(Nr=10, Ntheta=20),
         tiploss_model=NoTipLoss()
     )
