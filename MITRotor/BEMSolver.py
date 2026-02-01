@@ -130,7 +130,7 @@ class BEMSolution:
         return average(self.geom, Ctprime, grid=grid)
 
 
-@adaptivefixedpointiteration(max_iter=500, relaxations=[0.25, 0.5, 0.96])
+@adaptivefixedpointiteration(max_iter=1000, relaxations=[0.25, 0.5, 0.96])
 class BEM:
     """
     A generic BEM class which facilitates dependency injection for various models.
