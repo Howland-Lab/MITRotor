@@ -370,7 +370,7 @@ class BEMUnifiedMomentumLUT(MomentumModel):
         sol = self.model(Ct, eff_yaw)
         return sol.an
 
-    def compute_initial_wake_velocities(self, Ct: ArrayLike, yaw: float, tilt) -> ArrayLike:
+    def compute_initial_wake_velocities(self, Ct: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
         eff_yaw = UMM.calc_eff_yaw(yaw, tilt)
         sol = self.model(Ct, eff_yaw)
         w4 = np.zeros_like(sol.v4)
