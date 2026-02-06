@@ -72,7 +72,7 @@ def plot(df_surface: pl.DataFrame):
     cbar.set_label(label=r"$C_T~$(-)")
 
     # Save figure to file
-    plt.savefig(figdir / "example_3_pitch_tsr_contour.png", dpi=500, bbox_inches="tight")
+    plt.savefig(figdir / "example_03_pitch_tsr_contour.png", dpi=500, bbox_inches="tight")
 
 
 if __name__ == "__main__":
@@ -81,4 +81,3 @@ if __name__ == "__main__":
     print(df)
     print("plotting contour.")
     plot(df)
-    plt.show()
