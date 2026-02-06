@@ -62,6 +62,17 @@ class BladeAirfoils:
         return self.cd_interp(x, inflow, grid=False)
 
     def __call__(self, x, inflow, tsr=None, apply_3D_stall_correction=False, c_on_r=None):
+        '''
+        Inputs:
+            - x: radial position normalized by rotor radius (mu)
+            - inflow: angle of attack (radians)
+            - tsr: tip speed ratio (only needed if apply_3D_stall_correction=True)
+            - apply_3D_stall_correction: whether to apply 3D stall correction (Du and Selig 1998)
+            - c_on_r: chord-to-radius ratio (only needed if apply_3D_stall_correction=True)
+            
+        Returns:
+            - Cl, Cd with optional 3D stall correction applied
+        '''
         a = 1
         b = 1
         d = 1
@@ -70,17 +81,13 @@ class BladeAirfoils:
 
         if apply_3D_stall_correction:
             # Apply 3D stall correction (Du and Selig 1998)
-
-            # Compute alpha_0 (angle of attack at which Cl=0)
-            # aoa_line = np.radians(np.linspace(-10, 10, 100))
-            # Clp_line = self.Cl(x, aoa_line)
-            # alpha_0 = aoa_line[np.argmin(np.abs(Clp_line))]
-            # Clp = 
             
             # Compute slope of Cl curve
             CL1 = self.Cl(x, np.radians(0) * np.ones_like(x))
             CL2 = self.Cl(x, np.radians(5) * np.ones_like(x))
             m = (CL2 - CL1) / np.radians(5 - 0)
+
+            # Compute alpha_0 (angle of attack at which Cl=0)
             alpha_0 = -CL1 / m
 
             tsr_mod = 1 / np.sqrt(1 + tsr**2)
@@ -100,7 +107,6 @@ class BladeAirfoils:
                 ((a - c_on_r**exp2) / 
                  (b + c_on_r**exp2)) - 1)
             )
-            # breakpoint()
 
             Clp = m * (inflow - alpha_0)
 
