@@ -3,7 +3,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from MITRotor import BEM, BEMGeometry, IEA10MW, BEMSolution, MadsenMomentum
+from MITRotor import BEM, BEMGeometry, IEA10MW, BEMSolution, HeckMomentum
 
 figdir = Path("fig")
 figdir.mkdir(exist_ok=True, parents=True)
@@ -47,10 +47,10 @@ def plot_azimuthal_variations(sol: BEMSolution, save_to: Path):
 if __name__ == "__main__":
     # Initialize rotor with increased radial resolution.
     rotor = IEA10MW()
-    bem = BEM(rotor=rotor, geometry=BEMGeometry(Nr=100, Ntheta=10), momentum_model=MadsenMomentum(averaging='annulus'))
+    bem = BEM(rotor=rotor, geometry=BEMGeometry(Nr=100, Ntheta=10), momentum_model=HeckMomentum(averaging='sector'))
 
     # solve BEM for a control set point.
-    pitch, tsr, yaw = np.deg2rad(0), 7.0, np.deg2rad(0.0)
+    pitch, tsr, yaw = np.deg2rad(0), 7.0, np.deg2rad(20.0)
     sol = bem(pitch, tsr, yaw)
 
     # Plot
