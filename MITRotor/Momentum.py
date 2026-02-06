@@ -199,7 +199,7 @@ class MadsenMomentum(MomentumModel):
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
         if tilt != 0:
             raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
-        u4 = np.sqrt(1 - Ct)
+        u4 = np.sqrt(np.maximum(1 - Ct, 0))
         v4 = - (1/4) * Ct * np.sin(yaw)
         w4 = 0.0
         return u4, v4, w4
