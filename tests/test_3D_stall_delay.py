@@ -1,11 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 from MITRotor import (
     BEM,
     IEA10MW,
     DefaultAerodynamics
 )
 
+figdir = Path("fig")
+figdir.mkdir(exist_ok=True, parents=True)
 
 def test():
     model = BEM(
@@ -39,7 +42,7 @@ def test():
     ax[1].set_title("Drag Coefficient with 3D Stall Correction")
     ax[1].legend()
 
-    plt.savefig("3D_stall_correction_test.png")
+    plt.savefig(figdir / "3D_stall_correction_test.png")
 
 if __name__ == "__main__":
     test()
