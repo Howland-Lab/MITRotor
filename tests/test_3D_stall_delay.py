@@ -25,12 +25,10 @@ def test():
         mu, aoa, tsr=tsr, apply_3D_stall_correction=True
     )
 
-    # slope = model.rotor.clcd.slope_of_cl_curve(mu[0], )
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
     ax[0].plot(np.degrees(aoa), Cl_uncorr, label="2D Airfoil")
     ax[0].plot(np.degrees(aoa), Cl_corr, label="3D Stall Corrected")
-    # ax[0].plot(np.degrees(aoa),  (aoa + np.radians(3)), label="Thin Airfoil Theory", linestyle='--')
     ax[0].set_xlabel("Angle of Attack (degrees)")
     ax[0].set_ylabel("Cl")
     ax[0].set_title("Lift Coefficient with 3D Stall Correction")
