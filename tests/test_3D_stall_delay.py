@@ -3,9 +3,7 @@ import matplotlib.pyplot as plt
 from MITRotor import (
     BEM,
     IEA10MW,
-    DefaultAerodynamics,
-    UnifiedMomentum,
-    BEMGeometry,
+    DefaultAerodynamics
 )
 
 
