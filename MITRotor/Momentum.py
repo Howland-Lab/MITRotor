@@ -191,9 +191,8 @@ class HeckMomentum(MomentumModel):
             (1 - self.ac) ** 2 * np.sin(yaw) ** 2 + 4
         ) ** 2
 
-        a = (2 * Cx - 4 + np.sqrt(-(Cx**2) * np.sin(yaw) ** 2 - 16 * Cx + 16)) / (
-            -4 + np.sqrt(-(Cx**2) * np.sin(yaw) ** 2 - 16 * Cx + 16)
-        )
+        sqrt_term = np.sqrt(np.maximum(-(Cx**2) * np.sin(yaw) ** 2 - 16 * Cx + 16, 0))
+        a = (2 * Cx - 4 + sqrt_term) / (-4 + sqrt_term + 1e-16)
 
         mask = Cx > Ctc
         if np.iterable(Cx):
