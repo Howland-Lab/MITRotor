@@ -46,7 +46,16 @@ class MomentumModel(ABC):
     def compute_initial_wake_velocities(self, Ct: float, yaw: float = 0, tilt: float = 0.0) -> ArrayLike:
         ...
 
-
+    def __init__(self, averaging: Literal["sector", "annulus", "rotor"] = "rotor"):
+        if averaging == "rotor":
+            self._func = self._func_rotor
+        elif averaging == "annulus":
+            self._func = self._func_annulus
+        elif averaging == "sector":
+            self._func = self._func_sector
+        else:
+            raise ValueError(f"Averaging method {averaging} not found.")
+        self.averaging = averaging
     
     def _func_rotor(
         self,
