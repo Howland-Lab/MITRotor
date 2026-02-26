@@ -12,7 +12,6 @@ def test_tangential_induction_model_imports():
 def test_tip_loss_model_imports():
     from MITRotor import TipLossModel, NoTipLoss, PrandtlTipLoss
 
-
 def test_momentum_model_imports():
     from MITRotor import (
         MomentumModel,
@@ -21,6 +20,7 @@ def test_momentum_model_imports():
         HeckMomentum,
         UnifiedMomentum,
         MadsenMomentum,
+        UnifiedMomentumLUT,
     )
 
 
