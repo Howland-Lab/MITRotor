@@ -7,8 +7,8 @@ readme = "README.md"
 packages = [{ include = "MITRotor" }]
 
 [tool.poetry.dependencies]
-python = "^3.8"
-numpy = ">=1.16.5"
+python = ">=3.10,<4.0"
+numpy = "^2.2.1"
 scipy = ">=1.6"
 unified-momentum-model = {git = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"}
 pyyaml = "^6.0.1"

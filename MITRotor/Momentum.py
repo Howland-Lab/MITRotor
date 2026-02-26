@@ -1,8 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Literal
 import numpy as np
+import polars as pl
+import itertools
+from foreach import foreach
 from numpy.typing import ArrayLike
-
+from MITRotor.CachedLUT import CachedLUT
+from pathlib import Path
 from UnifiedMomentumModel import Momentum as UMM
 
 if TYPE_CHECKING:
@@ -42,7 +46,6 @@ class MomentumModel(ABC):
     def compute_initial_wake_velocities(self, Ct: float, yaw: float = 0, tilt: float = 0.0) -> ArrayLike:
         ...
 
-
     
     def _func_rotor(
         self,
@@ -81,7 +84,7 @@ class MomentumModel(ABC):
         annulus_avg_axial_force = (
             
                 geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, 0, 1.69)
+                    np.clip(aero_props.C_x_corr, -10, 10)
                     )
                     )[:, None] * np.ones(geom.shape)
         
@@ -98,7 +101,7 @@ class MomentumModel(ABC):
         geom: "BEMGeometry",
         tilt: float = 0.0,
     ) -> ArrayLike:
-        axial_force = np.clip(aero_props.C_x_corr, 0, 1.69)
+        axial_force = np.clip(aero_props.C_x_corr, -10, 10)
 
         return self.compute_induction(axial_force, yaw = yaw, tilt = tilt)
 
@@ -119,6 +122,7 @@ class MomentumModel(ABC):
 class ConstantInduction(MomentumModel):
     def __init__(self, a = 1/3):
         self.a = a
+        self._func = self._func_rotor
 
     def compute_induction(self, Cx, yaw, tilt = 0) -> ArrayLike:
         if tilt != 0:
@@ -161,6 +165,47 @@ class ClassicalMomentum(MomentumModel):
 
 
 
+class MadsenMomentum(MomentumModel):
+    """
+    Madsen Momentum model based on 2020 paper:
+    https://wes.copernicus.org/articles/5/1/2020/
+    """
+    def __init__(self, 
+                 averaging: Literal["sector", "annulus", "rotor"] = "rotor",
+                 cosine_exponent: bool = False):
+        if averaging == "rotor":
+            self._func = self._func_rotor
+        elif averaging == "annulus":
+            self._func = self._func_annulus
+        elif averaging == "sector":
+            self._func = self._func_sector
+        else:
+            raise ValueError(f"Averaging method {averaging} not found for MadsenMomentum model.")
+        self.averaging = averaging
+        self.cosine_exponent = cosine_exponent
+
+
+    def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
+        if tilt != 0:
+            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+        if self.cosine_exponent:
+            Ct = Cx / (np.cos(yaw)**2)
+        else:
+            Ct = Cx
+
+        an = Ct**3 * 0.0883 + Ct**2 * 0.0586 + Ct * 0.2460
+        return an
+
+    def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
+        if tilt != 0:
+            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+        u4 = np.sqrt(np.maximum(1 - Ct, 0))
+        v4 = - (1/4) * Ct * np.sin(yaw)
+        w4 = 0.0
+        return u4, v4, w4
+
+
+
 class HeckMomentum(MomentumModel):
     """
     Heck Momentum model based on 2023 paper:
@@ -191,9 +236,8 @@ class HeckMomentum(MomentumModel):
             (1 - self.ac) ** 2 * np.sin(yaw) ** 2 + 4
         ) ** 2
 
-        a = (2 * Cx - 4 + np.sqrt(-(Cx**2) * np.sin(yaw) ** 2 - 16 * Cx + 16)) / (
-            -4 + np.sqrt(-(Cx**2) * np.sin(yaw) ** 2 - 16 * Cx + 16)
-        )
+        sqrt_term = np.sqrt(np.maximum(-(Cx**2) * np.sin(yaw) ** 2 - 16 * Cx + 16, 0))
+        a = (2 * Cx - 4 + sqrt_term) / (-4 + sqrt_term + 1e-16)
 
         mask = Cx > Ctc
         if np.iterable(Cx):
@@ -248,14 +292,66 @@ class UnifiedMomentum(MomentumModel):
         return sol.u4, sol.v4, sol.w4
 
 
-class MadsenMomentum(MomentumModel):
-    """
-    Madsen Momentum model based on 2020 paper:
-    https://wes.copernicus.org/articles/5/1/2020/
-    """
-    def __init__(self, 
-                 averaging: Literal["sector", "annulus", "rotor"] = "rotor",
-                 cosine_exponent: bool = False):
+# Look-up table for unified model
+def func_Ct(x) -> dict:
+    Ct, yaw = x
+    model_Ct = UMM.ThrustBasedUnified()
+    sol = model_Ct(Ct, np.deg2rad(np.round(yaw, 2)))
+    return dict(
+        yaw=np.round(yaw, 2),
+        Ctprime=sol.Ctprime,
+        Cp=sol.Cp,
+        Ct=Ct,
+        an=sol.an,
+        u4=sol.u4,
+        v4=sol.v4,
+        x0=sol.x0,
+        dp=sol.dp,
+        dp_NL=sol.dp_NL,
+    )
+
+CACHE_FN_CT = Path(__file__).parent / "unified_momentum_model_Ct_table.csv"
+class ThrustBasedUnifiedMomentumLUT(CachedLUT, UMM.MomentumBase):
+    def __init__(self, cache_fn: Path = CACHE_FN_CT, regenerate=False, s=0.025):
+        super().__init__(
+            "yaw",
+            "Ct",
+            ["Cp", "Ctprime", "an", "u4", "v4", "x0", "dp"],
+            cache_fn,
+            regenerate=regenerate,
+            s=s,
+        )
+
+    def generate_table(self) -> pl.DataFrame:
+        Cts = np.linspace(-1, 1.5, 100)
+        yaws = np.arange(-50.0, 50.1, 2.0)
+        params = list(itertools.product(Cts, yaws))
+
+        # Run unified model and variations
+        results = foreach(func_Ct, params, parallel=True)
+
+        return pl.from_dicts(results).unique(["yaw", "Ct"])
+
+    def __call__(self, Ct: ArrayLike, yaw: ArrayLike) -> UMM.MomentumSolution:
+        yaw_deg = np.rad2deg(yaw)
+        return UMM.MomentumSolution(
+            self.interpolators["Ctprime"](Ct, yaw_deg, grid=False),
+            yaw,
+            self.interpolators["an"](Ct, yaw_deg, grid=False),
+            self.interpolators["u4"](Ct, yaw_deg, grid=False),
+            self.interpolators["v4"](Ct, yaw_deg, grid=False),
+            self.interpolators["x0"](Ct, yaw_deg, grid=False),
+            self.interpolators["dp"](Ct, yaw_deg, grid=False),
+        )
+
+
+class BEMUnifiedMomentumLUT(MomentumModel):
+    def __init__(
+        self,
+        averaging: Literal[
+            "sector", "annulus", "rotor"
+        ] = "rotor",
+    ):
         if averaging == "rotor":
             self._func = self._func_rotor
         elif averaging == "annulus":
@@ -263,26 +359,20 @@ class MadsenMomentum(MomentumModel):
         elif averaging == "sector":
             self._func = self._func_sector
         else:
-            raise ValueError(f"Averaging method {averaging} not found for MadsenMomentum model.")
+            raise ValueError(
+                f"Averaging method {averaging} not found for BEMUnifiedMomentumLUT model."
+            )
         self.averaging = averaging
-        self.cosine_exponent = cosine_exponent
+        self.model = ThrustBasedUnifiedMomentumLUT()
 
+    def compute_induction(self, Ct: ArrayLike, yaw: float, tilt) -> ArrayLike:
+        eff_yaw = UMM.calc_eff_yaw(yaw, tilt)
+        sol = self.model(Ct, eff_yaw)
+        return sol.an
 
-    def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
-        if self.cosine_exponent:
-            Ct = Cx / (np.cos(yaw)**2)
-        else:
-            Ct = Cx
-
-        an = Ct**3 * 0.0883 + Ct**2 * 0.0586 + Ct * 0.2460
-        return an
-
-    def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
-        u4 = np.sqrt(1 - Ct)
-        v4 = - (1/4) * Ct * np.sin(yaw)
-        w4 = 0.0
+    def compute_initial_wake_velocities(self, Ct: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
+        eff_yaw = UMM.calc_eff_yaw(yaw, tilt)
+        sol = self.model(Ct, eff_yaw)
+        w4 = np.zeros_like(sol.v4)
+        u4, v4, w4 = UMM.eff_yaw_inv_rotation(sol.u4, sol.v4, w4, eff_yaw, yaw, tilt)
         return u4, v4, w4
