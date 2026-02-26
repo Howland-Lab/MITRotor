@@ -10,7 +10,7 @@ class BEMGeometry:
         self.Nr = Nr
         self.Ntheta = Ntheta
 
-        self.mu = np.linspace(0.0, 0.9999, Nr)
+        self.mu = np.linspace(0.0, 0.99999, Nr)
         self.theta = np.linspace(0.0, 2 * np.pi, Ntheta)
 
         self.theta_mesh, self.mu_mesh = np.meshgrid(self.theta, self.mu)
@@ -42,12 +42,12 @@ class BEMGeometry:
         return X, Y, Z
 
     def annulus_average(self, X: ArrayLike):
-        X_azim = 1 / (2 * np.pi) * np.trapezoid(X, self.theta_mesh, axis=-1)
+        X_azim = 1 / (2 * np.pi) * np.trapz(X, self.theta_mesh, axis=-1)
 
         return X_azim
 
     def rotor_average(self, X: ArrayLike):
         # Takes annulus average quantities and performs rotor average
 
-        X_rotor = 2 * np.trapezoid(X * self.mu, self.mu)
+        X_rotor = 2 * np.trapz(X * self.mu, self.mu)
         return X_rotor
