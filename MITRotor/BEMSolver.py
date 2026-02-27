@@ -169,21 +169,32 @@ class BEM:
         return X, Y, Z
     
     def pre_process(self, pitch, tsr, yaw = 0, tilt = 0, **kwargs):
+        # expand geometries and setpoints to ensure broadcasting
+        self.geometry.mu_mesh = np.asarray(self.geometry.mu_mesh)[..., None]
+        self.geometry.theta_mesh = np.asarray(self.geometry.theta_mesh)[..., None]
+        yaw = np.asarray(yaw)[None, None, :]
+        tilt = np.asarray(tilt)[None, None, :]
         # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
-        self.aerodynamic_model.eff_yaw = calc_eff_yaw(yaw, tilt)
-        if tilt == 0:
-            dtheta = 0
-        elif yaw == 0:
-            dtheta = np.pi / 2
-        else: # non-zero yaw and tilt
-            sin_eff = np.sin(self.aerodynamic_model.eff_yaw)
-            dtheta = np.arccos(np.sin(yaw) / sin_eff)
-        self.aerodynamic_model.eff_theta_mesh = self.geometry.theta_mesh + dtheta
+        eff_yaw = calc_eff_yaw(yaw, tilt)
+        self.aerodynamic_model.eff_yaw = eff_yaw
+        # initialize dtheta
+        dtheta = np.zeros_like(eff_yaw)
+        # masks
+        yaw_zero = (yaw == 0)
+        not_tilt_zero = ~(tilt == 0)
+        # case1: yaw == 0 and tilt != 0
+        dtheta[yaw_zero & not_tilt_zero] = np.pi / 2
+        # case2: yaw != 0 and tilt != 0
+        case2 = ~yaw_zero & not_tilt_zero
+        dtheta[case2] = np.arccos(
+            np.sin(yaw[case2]) / np.sin(eff_yaw[case2])
+        )
+        self.aerodynamic_model.delta_theta = dtheta
         return
 
     def initial_guess(self, *args, **kwargs) -> Tuple[ArrayLike, ...]:
-        a = (1 / 3) * np.ones(self.geometry.shape)
-        aprime = np.zeros(self.geometry.shape)
+        a = (1 / 3) * np.ones_like(self.geometry.mu_mesh)
+        aprime = np.zeros_like(self.geometry.mu_mesh)
 
         return a, aprime
 
@@ -198,8 +209,8 @@ class BEM:
         tilt: ArrayLike = 0.0,
     ) -> Tuple[ArrayLike, ...]:
         an, aprime = x
-        U = np.ones(self.geometry.shape) if U is None else U
-        wdir = np.zeros(self.geometry.shape) if wdir is None else wdir
+        U = np.ones_like(self.geometry.mu_mesh) if U is None else U
+        wdir = np.zeros_like(self.geometry.mu_mesh) if wdir is None else wdir
 
         aero_props = self.aerodynamic_model(
             an = an, 

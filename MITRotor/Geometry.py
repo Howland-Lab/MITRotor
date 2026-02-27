@@ -51,3 +51,9 @@ class BEMGeometry:
 
         X_rotor = 2 * np.trapezoid(X * self.mu, self.mu)
         return X_rotor
+    
+    def expand_geometry(x):
+        return np.asarray(x)[..., None]
+
+    def expand_operating(x):
+        return np.asarray(x).ravel()[None, None, :]
