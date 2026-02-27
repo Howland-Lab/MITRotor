@@ -42,18 +42,26 @@ class BEMGeometry:
         return X, Y, Z
 
     def annulus_average(self, X: ArrayLike):
-        X_azim = 1 / (2 * np.pi) * np.trapezoid(X, self.theta_mesh, axis=-1)
+        # Take average over the theta values at a given radius
+        X_azim = 1 / (2 * np.pi) * np.trapezoid(X, self.theta_mesh, axis=get_theta_axis())
 
         return X_azim
 
     def rotor_average(self, X: ArrayLike):
-        # Takes annulus average quantities and performs rotor average
-
-        X_rotor = 2 * np.trapezoid(X * self.mu, self.mu)
+        # Takes annulus average quantities and averages over each radius
+        X_rotor = 2 * np.trapezoid(X * self.mu, self.mu, axis=get_rad_axis())
         return X_rotor
     
-    def expand_geometry(x):
-        return np.asarray(x)[..., None]
 
-    def expand_operating(x):
-        return np.asarray(x).ravel()[None, None, :]
+def expand_geometry(x):
+    return np.asarray(x)[..., None]
+
+def expand_setpoint(x):
+    return np.asarray(x).ravel()[None, None, :]
+
+def get_rad_axis(): # update these with expand_geometry and expand_setpoint
+    return 0
+
+def get_theta_axis():
+    return 1
+

@@ -7,10 +7,11 @@ from UnifiedMomentumModel.Utilities.FixedPointIteration import FixedPointIterati
 
 from . import Momentum, TipLoss
 from .Aerodynamics import AerodynamicModel, AerodynamicProperties, DefaultAerodynamics
-from .Geometry import BEMGeometry
+from .Geometry import BEMGeometry, expand_geometry, expand_setpoint
 from .RotorDefinition import RotorDefinition
 from .TangentialInduction import DefaultTangentialInduction, TangentialInductionModel
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
+
 
 
 def average(geometry: BEMGeometry, value: ArrayLike, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -170,10 +171,12 @@ class BEM:
     
     def pre_process(self, pitch, tsr, yaw = 0, tilt = 0, **kwargs):
         # expand geometries and setpoints to ensure broadcasting
-        self.geometry.mu_mesh = np.asarray(self.geometry.mu_mesh)[..., None]
-        self.geometry.theta_mesh = np.asarray(self.geometry.theta_mesh)[..., None]
-        yaw = np.asarray(yaw)[None, None, :]
-        tilt = np.asarray(tilt)[None, None, :]
+        self.geometry.mu_mesh = expand_geometry(self.geometry.mu_mesh)
+        self.geometry.theta_mesh = expand_geometry(self.geometry.theta_mesh)
+        self.geometry.mu = expand_geometry(self.geometry.mu)
+        self.geometry.theta = expand_geometry(self.geometry.theta)
+        yaw = expand_setpoint(yaw)
+        tilt = expand_setpoint(tilt)
         # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
         eff_yaw = calc_eff_yaw(yaw, tilt)
         self.aerodynamic_model.eff_yaw = eff_yaw
@@ -232,8 +235,8 @@ class BEM:
         return e_an, e_aprime
 
     def post_process(self, result: FixedPointIterationResult, pitch, tsr, yaw = 0, U=None, wdir=None, tilt = 0.0) -> BEMSolution:
-        U = np.ones(self.geometry.shape) if U is None else U
-        wdir = np.zeros(self.geometry.shape) if wdir is None else wdir
+        U = np.ones_like(self.geometry.mu_mesh) if U is None else U
+        wdir = np.zeros_like(self.geometry.mu_mesh) if wdir is None else wdir
         an, aprime = result.x
         aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir, tilt = tilt)
         aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt)

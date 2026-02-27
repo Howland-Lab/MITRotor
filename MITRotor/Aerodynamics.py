@@ -272,10 +272,11 @@ class DefaultAerodynamics(AerodynamicModel):
         # calculate values in "yaw-only" frame
         local_yaw = -self.eff_yaw
         Vax = U * ((1 - an) * np.cos(local_yaw))
+        theta_eff = geom.theta_mesh + self.delta_theta
         Vtan = (
             (1 + aprime) * tsr * geom.mu_mesh
             - U * (1 - an)
-            * np.cos(self.eff_theta_mesh)
+            * np.cos(theta_eff)
             * np.sin(local_yaw)
         )
 
@@ -291,8 +292,8 @@ class DefaultAerodynamics(AerodynamicModel):
             an = an,
             aprime = aprime,
             solidity = solidity,
-            U = U * np.ones(geom.shape),
-            wdir = wdir * np.ones(geom.shape),
+            U = U * np.ones_like(geom.mu_mesh),
+            wdir = wdir * np.ones_like(geom.mu_mesh),
             Vax = Vax,
             Vtan = Vtan,
             aoa = aoa,
