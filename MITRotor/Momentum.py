@@ -4,6 +4,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from UnifiedMomentumModel import Momentum as UMM
+from .Geometry import expand_azimuthal
 
 if TYPE_CHECKING:
     from .Geometry import BEMGeometry
@@ -59,8 +60,8 @@ class MomentumModel(ABC):
             geom.rotor_average(
                 geom.annulus_average(
                     np.clip(aero_props.C_x_corr, 0, 1.69)
-                    )
-                    )
+                )
+            )
         )
 
         return self.compute_induction(rotor_avg_axial_force, yaw = yaw, tilt = tilt)
@@ -78,12 +79,11 @@ class MomentumModel(ABC):
         tilt: float = 0.0,
     ) -> ArrayLike:
         
-        annulus_avg_axial_force = (
-            
+        annulus_avg_axial_force = expand_azimuthal(
                 geom.annulus_average(
                     np.clip(aero_props.C_x_corr, 0, 1.69)
-                    )
-                    )[:, None] * np.ones(geom.shape)
+                )
+        )
         
 
         return self.compute_induction(annulus_avg_axial_force, yaw = yaw, tilt = tilt)

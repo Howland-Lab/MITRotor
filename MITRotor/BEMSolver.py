@@ -173,8 +173,6 @@ class BEM:
         # expand geometries and setpoints to ensure broadcasting
         self.geometry.mu_mesh = expand_geometry(self.geometry.mu_mesh)
         self.geometry.theta_mesh = expand_geometry(self.geometry.theta_mesh)
-        self.geometry.mu = expand_geometry(self.geometry.mu)
-        self.geometry.theta = expand_geometry(self.geometry.theta)
         yaw = expand_setpoint(yaw)
         tilt = expand_setpoint(tilt)
         # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
