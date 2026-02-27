@@ -221,8 +221,8 @@ class BEM:
         )
         
         aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt)
-        e_an = self.momentum_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt) - an
-        e_aprime = self.tangential_induction_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt) - aprime
+        e_an = self.momentum_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt) - an[:, :, None]
+        e_aprime = self.tangential_induction_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt) - aprime[:, :, None]
 
         return e_an, e_aprime
 

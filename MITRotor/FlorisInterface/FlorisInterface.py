@@ -12,14 +12,14 @@ from floris.core.rotor_velocity import average_velocity
 from MITRotor.ReferenceTurbines import IEA15MW
 from MITRotor.Momentum import UnifiedMomentum
 from MITRotor.Geometry import BEMGeometry
-from MITRotor.TipLoss import NoTipLoss
+from MITRotor.TipLoss import NoTipLoss, PrandtlTipLoss
 from MITRotor.BEMSolver import BEM
 
 # default rotor if none provided by user (IEA 15MW)
 def default_bem_factory():
     return BEM(
         rotor=IEA15MW(),
-        momentum_model=UnifiedMomentum(averaging="rotor"),
+        momentum_model=UnifiedMomentum(averaging="sector"),
         geometry=BEMGeometry(Nr=10, Ntheta=20),
         tiploss_model=NoTipLoss()
     )
@@ -116,7 +116,8 @@ class MITRotorTurbine(BaseOperationModel):
             tsr = self.tsr_interp(rotor_average_velocities)
             for tindex in range(n_turbines):
                 # solve BEM
-                bem_sol = self.bem_model(pitch[:, tindex], tsr[:, tindex], yaw = yaw[:, tindex], tilt = tilt[:, tindex])
+                test = self.bem_model(pitch[:, tindex], tsr[:, tindex], yaw = yaw[:, tindex], tilt = tilt[:, tindex])
+                bem_sol = test
                 # get induction and thrust coeff
                 self._a[:, tindex] = bem_sol.a()
                 self._Ct[:, tindex] = bem_sol.Ct()

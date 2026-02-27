@@ -62,7 +62,20 @@ class BladeAirfoils:
         return self.cd_interp(x, inflow, grid=False)
 
     def __call__(self, x, inflow):
-        return self.Cl(x, inflow), self.Cd(x, inflow)
+        # inflow can be 2D or 3D (extra axis at the end)
+        if inflow.ndim == 3:  # last axis is extra, e.g., yaw
+            # loop over last axis
+            Cl_stack = []
+            Cd_stack = []
+            for i in range(inflow.shape[2]):
+                inflow_slice = inflow[:, :, i]
+                Cl_stack.append(self.Cl(x, inflow_slice))
+                Cd_stack.append(self.Cd(x, inflow_slice))
+            # stack along the last axis
+            return np.stack(Cl_stack, axis=2), np.stack(Cd_stack, axis=2)
+        else:
+            # inflow is 2D, call directly
+            return self.Cl(x, inflow), self.Cd(x, inflow)
 
 
 class RotorDefinition:

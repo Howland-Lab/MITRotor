@@ -95,14 +95,14 @@ class AerodynamicProperties:
         """
         Blade element axial area force coefficient.
         """
-        return self.solidity * self.W**2 * self.C_n
+        return self.solidity[:, :, None] * self.W**2 * self.C_n
 
     @cached_property
     def C_tau(self):
         """
         Blade element tangential area force coefficient.
         """
-        return self.solidity * self.W**2 * self.C_tan
+        return self.solidity[:, :, None] * self.W**2 * self.C_tan
     
     @cached_property
     def C_x_corr(self):
@@ -271,19 +271,18 @@ class DefaultAerodynamics(AerodynamicModel):
         """
         # calculate values in "yaw-only" frame
         local_yaw = -self.eff_yaw
-        Vax = U * ((1 - an[None, :, :]) * np.cos(local_yaw[:, None, None]))
-        theta_eff = geom.theta_mesh[None, :, :] + self.delta_theta[:, None, None]
+        Vax = U[:, :, None] * (1 - an)[:, :, None] * np.cos(local_yaw)[None, None, :]
+        theta_eff = geom.theta_mesh[:, :, None] + self.delta_theta[None, None, :]
         Vtan = (
-            (1 + aprime[None, :, :]) * tsr[:, None, None] * geom.mu_mesh[None, :, :]
-            - U * (1 - an[None, :, :])
+            (1 + aprime[:, :, None]) * tsr[None, None, :] * geom.mu_mesh[:, :, None]
+            - U[:, :, None] * (1 - an[:, :, None])
             * np.cos(theta_eff)
-            * np.sin(local_yaw[:, None, None])
+            * np.sin(local_yaw[None, None, :])
         )
 
         phi = np.arctan2(Vax, Vtan)
-        aoa = phi - rotor.twist(geom.mu_mesh) - pitch[:, None, None]
+        aoa = phi - rotor.twist(geom.mu_mesh)[:, :, None] - pitch[None, None, :]
         aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
-
         Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
 
         solidity = rotor.solidity(geom.mu_mesh)

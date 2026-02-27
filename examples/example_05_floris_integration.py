@@ -29,9 +29,9 @@ floris_air_density = 1.225
 # ------------------ run basic case --------------------------------------------------------
 fmodel = FlorisModel("defaults")
 time_series = TimeSeries(
-    wind_directions=np.array([270.0, 270.0, 280.0]),
-    wind_speeds=np.array([8.0, 10.0, 12.0]),
-    turbulence_intensities=np.array([0.06, 0.06, 0.06]),
+    wind_directions=np.array([270.0, 270.0]),#, 280.0]),
+    wind_speeds=np.array([8.0, 10.0]),#, 12.0]),
+    turbulence_intensities=np.array([0.06, 0.06]),#, 0.06]),
 )
 yaw_angles = np.array([
     [0.0, 0.0],   # condition 1

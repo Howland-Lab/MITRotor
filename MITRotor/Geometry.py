@@ -42,7 +42,7 @@ class BEMGeometry:
         return X, Y, Z
 
     def annulus_average(self, X: ArrayLike):
-        X_azim = 1 / (2 * np.pi) * np.trapezoid(X, self.theta_mesh, axis=-1)
+        X_azim = 1 / (2 * np.pi) * np.trapezoid(X, self.theta_mesh[:, :, None], axis=1) # TODO: this should go back to -1 once I switch yaw back to the front...
 
         return X_azim
 
@@ -52,10 +52,10 @@ class BEMGeometry:
         X_rotor = 2 * np.trapezoid(X * self.mu, self.mu)
         return X_rotor
     
-    def op(x):
-        """Operating-point axis"""
+    def expand_op(x):
+        """Add axes for operating points"""
         return x[:, None, None]
 
-    def mesh(x):
-        """Geometry mesh axis"""
+    def expand_mesh(x):
+        """Add axes for mesh dimensions"""
         return x[None, :, :]
