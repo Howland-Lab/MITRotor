@@ -48,6 +48,11 @@ jobs:
           except Exception as e:
               print("SciPy not available:", e)
           EOF
+      - name: Disable BLAS threading
+        run: |
+          echo "OMP_NUM_THREADS=1" >> $GITHUB_ENV
+          echo "OPENBLAS_NUM_THREADS=1" >> $GITHUB_ENV
+          echo "MKL_NUM_THREADS=1" >> $GITHUB_ENV
 
       - name: Run pytest
         run: python -m pytest
