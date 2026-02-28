@@ -59,7 +59,7 @@ csv_file = os.path.join(module_dir, "..", "MITRotor", "FlorisInterface", "IEA_15
 df = pl.read_csv(csv_file)
 
 wind_table = df["Wind [m/s]"].to_numpy()
-wind_speeds = np.linspace(3, 25, 50)
+wind_speeds = np.linspace(5, 25, 20)
 wind_dirs = np.full_like(wind_speeds, 270.0)
 turbulence_intensity = np.zeros_like(wind_speeds)
 
@@ -104,9 +104,10 @@ plt.savefig(figdir / "example_5_pitch_tsr_interpolation.png", dpi=300)
 
 # -------- plot CT and CP values against one another and against IEA15MW from figure 3.1-C (https://docs.nrel.gov/docs/fy20osti/75698.pdf) -------
 # solve UMM-BEM though MITRotor - rotor averaged
+pitches_rad = np.deg2rad(pitches)
 bem_rotor_umm = default_bem_factory()
 mit_rotor_umm_start = time.time()
-mit_sols_rotor_umm = [bem_rotor_umm(pitch=np.deg2rad(pitch_interp(u)), tsr=tsr_interp(u), yaw=0, tilt=0) for u in wind_speeds]
+mit_sols_rotor_umm = [bem_rotor_umm(pitch=pitches_rad[i], tsr=tsrs[i], yaw=0, tilt=0) for i in range(len(tsrs))]
 mit_rotor_umm_end = time.time()
 mit_Ct_rotor_umm = [sol.Ct() for sol in mit_sols_rotor_umm]
 mit_Cp_rotor_umm = [sol.Cp() for sol in mit_sols_rotor_umm]
@@ -120,7 +121,7 @@ bem_annulus_umm = BEM(
         tiploss_model=NoTipLoss(),
     )
 mit_annulus_umm_start = time.time()
-mit_sols_annulus_umm = [bem_annulus_umm(pitch=np.deg2rad(pitch_interp(u)), tsr=tsr_interp(u), yaw=0, tilt=0) for u in wind_speeds]
+mit_sols_annulus_umm = [bem_annulus_umm(pitch=pitches_rad[i], tsr=tsrs[i], yaw=0, tilt=0) for i in range(len(tsrs))]
 mit_annulus_umm_end = time.time()
 mit_Ct_annulus_umm = [sol.Ct() for sol in mit_sols_annulus_umm]
 mit_Cp_annulus_umm = [sol.Cp() for sol in mit_sols_annulus_umm]
