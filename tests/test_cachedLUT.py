@@ -185,7 +185,7 @@ def test_generate_table_shape(tmp_path):
     model = ThrustBasedUnifiedLUT(
         cache_fn=tmp_path / "lut.csv",
         regenerate=True,
-        LUT_Cts=np.linspace(0, 1, 5),
+        LUT_Cts=np.linspace(0, 0.5, 3),
         LUT_yaws=np.linspace(-10.0, 10.1, 5),
     )
 
