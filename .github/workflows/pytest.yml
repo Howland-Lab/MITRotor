@@ -32,27 +32,5 @@ jobs:
           pip install .
           pip install pytest
 
-      - name: Show Python / NumPy / SciPy versions
-        run: |
-          python - <<EOF
-          import sys
-          print("Python:", sys.version)
-          try:
-              import numpy
-              print("NumPy:", numpy.__version__)
-          except Exception as e:
-              print("NumPy not available:", e)
-          try:
-              import scipy
-              print("SciPy:", scipy.__version__)
-          except Exception as e:
-              print("SciPy not available:", e)
-          EOF
-      - name: Disable BLAS threading
-        run: |
-          echo "OMP_NUM_THREADS=1" >> $GITHUB_ENV
-          echo "OPENBLAS_NUM_THREADS=1" >> $GITHUB_ENV
-          echo "MKL_NUM_THREADS=1" >> $GITHUB_ENV
-
       - name: Run pytest
         run: python -m pytest
