@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 import polars as pl
 import itertools
-from foreach import foreach
+# from foreach import foreach
 from numpy.typing import ArrayLike
 from MITRotor.CachedLUT import CachedLUT
 from pathlib import Path
@@ -355,7 +355,10 @@ class ThrustBasedUnifiedLUT(CachedLUT, UMM.MomentumBase):
     def generate_table(self) -> pl.DataFrame:
         params = list(itertools.product(self._Cts, self._eff_yaws))
         # Run unified model and variations
-        results = foreach(func_Ct, params, parallel=True)
+        # results = foreach(func_Ct, params, parallel=True)
+        results = []
+        for param in params:
+            results.append(func_Ct(param))
         # Save results for unique combos of Ct and eff_yaw
         return pl.from_dicts(results).unique(["Ct", "eff_yaw"])
 
