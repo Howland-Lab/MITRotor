@@ -168,67 +168,61 @@ def test_no_regenerate_uses_cache(tmp_path):
 # ------------------------------------------------------------------
 # Test ThrustBasedUnifiedLUT behavior and correctness
 # ------------------------------------------------------------------
-# @pytest.fixture(scope="module")
-# def lut(tmp_path_factory):
-#     tmp_dir = tmp_path_factory.mktemp("lut_cache")
-#     cache_file = tmp_dir / "lut.csv"
-
-#     return ThrustBasedUnifiedLUT(
-#         cache_fn=cache_file,
-#         regenerate=True,
-#         s=0,
-#         LUT_Cts=np.linspace(-0.5, 1.5, 30),
-#         LUT_yaws=np.linspace(-15, 15, 30),
-#     )
-
-def test_generate_table_shape(tmp_path):
-    model = ThrustBasedUnifiedLUT(
-        cache_fn=tmp_path / "lut.csv",
+@pytest.fixture(scope="module")
+def lut_model(tmp_path_factory):
+    cache_dir = tmp_path_factory.mktemp("lut_cache")
+    cache_file = cache_dir / "lut.csv"
+    lut_model = ThrustBasedUnifiedLUT(
+        cache_fn=cache_file,
         regenerate=True,
-        LUT_Cts=np.linspace(0, 0.75, 4),
-        LUT_yaws=np.linspace(-10.0, 10.1, 4),
+        LUT_Cts=np.linspace(-0.5,1,12),
+        LUT_yaws=np.linspace(-15.0,15.1,12),
+    )
+    return lut_model
+
+def test_generate_table_shape(lut_model):
+    assert lut_model.df.shape[0] == 144
+    assert set(lut_model.df.columns) == {"eff_yaw", "Ctprime", "Cp", "Ct", "an", "u4", "v4", "w4", "x0", "dp", "dp_NL"}
+
+@pytest.mark.parametrize("Ct,yaw,tilt", [
+    (0.2, np.deg2rad(0.0), np.deg2rad(0.0)),
+    (0.2, np.deg2rad(0.0), np.deg2rad(10.0)),
+    (0.8, np.deg2rad(8.0), np.deg2rad(0.0)),
+    (1.0, np.deg2rad(-8.0), np.deg2rad(6.0)),
+    (1.0, np.deg2rad(-6.0), np.deg2rad(-8.0)),
+])
+def test_lut_matches_unified_model(lut_model, Ct, yaw, tilt):
+    ref_model = UMM.ThrustBasedUnified()
+    sol_ref = ref_model(Ct, yaw, tilt = tilt)
+    sol_lut = lut_model(Ct, yaw, tilt = tilt)
+    atol = 1e-2 
+    rtol = 0.02
+    np.testing.assert_allclose(sol_lut.an, sol_ref.an, atol=atol, rtol = rtol)
+    np.testing.assert_allclose(sol_lut.Cp, sol_ref.Cp, atol=atol, rtol = rtol)
+    np.testing.assert_allclose(sol_lut.u4, sol_ref.u4, atol=atol, rtol = rtol)
+    np.testing.assert_allclose(sol_lut.v4, sol_ref.v4, atol=atol, rtol = rtol)
+
+def test_compute_induction_rotor(lut_model):
+    ref_model = UnifiedMomentum()
+    lut_model = UnifiedMomentumLUT(
+        s = 0,
+        cache_fn=lut_model.cache_fn,
+        regenerate=False, # uses the same LUT as previous test
     )
 
-    assert model.df.shape[0] == 16
-    assert set(model.df.columns) == {"eff_yaw", "Ctprime", "Cp", "Ct", "an", "u4", "v4", "w4", "x0", "dp", "dp_NL"}
+    Ct = np.array([0.8])
+    yaw = np.deg2rad(12.0)
+    tilt = np.deg2rad(4.0)
 
-# @pytest.mark.parametrize("Ct,yaw,tilt", [
-#     (0.2, np.deg2rad(0.0), np.deg2rad(0.0)),
-#     (0.2, np.deg2rad(0.0), np.deg2rad(10.0)),
-#     (0.8, np.deg2rad(8.0), np.deg2rad(0.0)),
-#     (1.0, np.deg2rad(-8.0), np.deg2rad(6.0)),
-#     (1.0, np.deg2rad(-6.0), np.deg2rad(-8.0)),
-# ])
-# def test_lut_matches_unified_model(lut, Ct, yaw, tilt):
-#     ref_model = UMM.ThrustBasedUnified()
-#     sol_ref = ref_model(Ct, yaw, tilt = tilt)
-#     sol_lut = lut(Ct, yaw, tilt = tilt)
-#     atol = 1e-2
-#     np.testing.assert_allclose(sol_lut.an, sol_ref.an, atol=atol)
-#     np.testing.assert_allclose(sol_lut.Cp, sol_ref.Cp, atol=atol)
-#     np.testing.assert_allclose(sol_lut.u4, sol_ref.u4, atol=atol)
-#     np.testing.assert_allclose(sol_lut.v4, sol_ref.v4, atol=atol)
+    an_ref = ref_model.compute_induction(Ct, yaw, tilt=tilt)
+    an_lut = lut_model.compute_induction(Ct, yaw, tilt=tilt)
 
-# def test_compute_induction_rotor(tmp_path):
-#     model = UnifiedMomentum()
-#     modelLUT = UnifiedMomentumLUT(
-#         s = 0,
-#         cache_fn=tmp_path / "lut.csv",
-#         regenerate=False, # uses the same LUT as previous test
-#     )
+    u4_ref, v4_ref, w4_ref = ref_model.compute_initial_wake_velocities(Ct, yaw, tilt = tilt)
+    u4_lut, v4_lut, w4_lut = lut_model.compute_initial_wake_velocities(Ct, yaw, tilt = tilt)
 
-#     Ct = np.array([0.8])
-#     yaw = np.deg2rad(12.0)
-#     tilt = np.deg2rad(4.0)
-
-#     an_ref = model.compute_induction(Ct, yaw, tilt=tilt)
-#     an_lut = modelLUT.compute_induction(Ct, yaw, tilt=tilt)
-
-#     u4_ref, v4_ref, w4_ref = model.compute_initial_wake_velocities(Ct, yaw, tilt = tilt)
-#     u4_lut, v4_lut, w4_lut = modelLUT.compute_initial_wake_velocities(Ct, yaw, tilt = tilt)
-
-#     atol = 1e-2
-#     np.testing.assert_allclose(an_lut, an_ref, atol=atol)
-#     np.testing.assert_allclose(u4_lut, u4_ref, atol=atol)
-#     np.testing.assert_allclose(v4_lut, v4_ref, atol=atol)
-#     np.testing.assert_allclose(w4_lut, w4_ref, atol=atol)
+    atol = 1e-2 
+    rtol = 0.02
+    np.testing.assert_allclose(an_lut, an_ref, atol=atol, rtol = rtol)
+    np.testing.assert_allclose(u4_lut, u4_ref, atol=atol, rtol = rtol)
+    np.testing.assert_allclose(v4_lut, v4_ref, atol=atol, rtol = rtol)
+    np.testing.assert_allclose(w4_lut, w4_ref, atol=atol, rtol = rtol)
