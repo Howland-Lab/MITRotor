@@ -185,14 +185,12 @@ def test_generate_table_shape(tmp_path):
     model = ThrustBasedUnifiedLUT(
         cache_fn=tmp_path / "lut.csv",
         regenerate=True,
-        LUT_Cts=np.linspace(0, 0.5, 3),
-        LUT_yaws=np.linspace(-10.0, 10.1, 5),
+        LUT_Cts=np.linspace(0, 0.75, 4),
+        LUT_yaws=np.linspace(-10.0, 10.1, 4),
     )
 
-    df = model.generate_table()
-
-    assert df.shape[0] == 25
-    assert set(df.columns) == {"eff_yaw", "Ctprime", "Cp", "Ct", "an", "u4", "v4", "w4", "x0", "dp", "dp_NL"}
+    assert model.df.shape[0] == 16
+    assert set(model.df.columns) == {"eff_yaw", "Ctprime", "Cp", "Ct", "an", "u4", "v4", "w4", "x0", "dp", "dp_NL"}
 
 # @pytest.mark.parametrize("Ct,yaw,tilt", [
 #     (0.2, np.deg2rad(0.0), np.deg2rad(0.0)),
