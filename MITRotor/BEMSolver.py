@@ -7,7 +7,7 @@ from UnifiedMomentumModel.Utilities.FixedPointIteration import FixedPointIterati
 
 from . import Momentum, TipLoss
 from .Aerodynamics import AerodynamicModel, AerodynamicProperties, DefaultAerodynamics
-from .Geometry import BEMGeometry, expand_geometry, expand_setpoint
+from .Geometry import BEMGeometry, expand_geometry, expand_to_Nr_Ntheta
 from .RotorDefinition import RotorDefinition
 from .TangentialInduction import DefaultTangentialInduction, TangentialInductionModel
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
@@ -103,7 +103,7 @@ class BEMSolution:
     
     def Cp(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         dCp = (
-            self.tsr
+            expand_to_Nr_Ntheta(self.tsr)
             * self.geom.mu_mesh
             * self.Ctau_uncorr(grid="sector")
         )
@@ -111,7 +111,7 @@ class BEMSolution:
     
     def Cp_corr(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         dCp = (
-            self.tsr
+            expand_to_Nr_Ntheta(self.tsr)
             * self.geom.mu_mesh
             * self.Ctau(grid="sector")
         )
@@ -170,16 +170,10 @@ class BEM:
         return X, Y, Z
     
     def pre_process(self, pitch, tsr, yaw = 0, tilt = 0, **kwargs):
-        # expand geometries and setpoints to ensure broadcasting
-        self.geometry.mu_mesh = expand_geometry(self.geometry.mu_mesh)
-        self.geometry.theta_mesh = expand_geometry(self.geometry.theta_mesh)
-        yaw = expand_setpoint(yaw)
-        tilt = expand_setpoint(tilt)
         # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
         eff_yaw = calc_eff_yaw(yaw, tilt)
-        self.aerodynamic_model.eff_yaw = eff_yaw
         # initialize dtheta
-        dtheta = np.zeros_like(eff_yaw)
+        dtheta = np.zeros_like(yaw)
         # masks
         yaw_zero = (yaw == 0)
         not_tilt_zero = ~(tilt == 0)
@@ -190,7 +184,11 @@ class BEM:
         dtheta[case2] = np.arccos(
             np.sin(yaw[case2]) / np.sin(eff_yaw[case2])
         )
-        self.aerodynamic_model.delta_theta = dtheta
+        # expand everything to the correct dimensions to ensure broadcasting
+        self.aerodynamic_model.eff_yaw = expand_to_Nr_Ntheta(eff_yaw)
+        self.aerodynamic_model.delta_theta = expand_to_Nr_Ntheta(dtheta)
+        self.geometry.mu_mesh = expand_geometry(self.geometry.mu_mesh)
+        self.geometry.theta_mesh = expand_geometry(self.geometry.theta_mesh)
         return
 
     def initial_guess(self, *args, **kwargs) -> Tuple[ArrayLike, ...]:

@@ -55,26 +55,37 @@ class BEMGeometry:
 
 def expand_geometry(x):
     if x.ndim < 3:
-        return x[..., None]
+        return x[None, ...]
     else:
         return x
 
-def expand_setpoint(x):
+def expand_to_Nr_Ntheta(x):
     x = np.asarray(x)
     if x.ndim < 3:
-        return x[None, None, :]
+        return x[:, None, None]
     else:
         return x
     
-def expand_azimuthal(x):
-    return x[:, None, :]
+def expand_to_Nr(x):
+    x = np.asarray(x)
+    if x.ndim < 2:
+        return x[:, None]
+    else:
+        return x
+    
+def expand_to_Ntheta(x):
+    x = np.asarray(x)
+    if x.ndim < 3:
+        return x[:, :, None]
+    else:
+        return x
 
 def expand_mu(mu):
-    return mu[:, None]
+    return mu[None, :]
 
-def get_rad_axis(): # update these with expand_geometry and expand_setpoint
-    return 0
+def get_rad_axis(): # update these with expand_geometry and expand_to_Nr_Ntheta
+    return 1
 
 def get_theta_axis():
-    return 1
+    return 2
 

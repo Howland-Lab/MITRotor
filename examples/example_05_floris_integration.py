@@ -129,6 +129,20 @@ mit_Ct_annulus_umm = mit_sols_annulus_umm.Ct()
 mit_Cp_annulus_umm = mit_sols_annulus_umm.Cp()
 print("MITRotor UMM-BEM Annulus-Averaged: " + str(mit_annulus_umm_end - mit_annulus_umm_start) + " seconds")
 
+# solve UMM-BEM though MITRotor - sector averaged
+bem_sector_umm = BEM(
+        rotor=IEA15MW(),
+        momentum_model=UnifiedMomentum(averaging="sector"),
+        geometry=BEMGeometry(Nr=10, Ntheta=20),
+        tiploss_model=NoTipLoss(),
+    )
+mit_sector_umm_start = time.time()
+mit_sols_sector_umm = bem_sector_umm(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
+mit_sector_umm_end = time.time()
+mit_Ct_sector_umm = mit_sols_sector_umm.Ct()
+mit_Cp_sector_umm = mit_sols_sector_umm.Cp()
+print("MITRotor UMM-BEM Sector-Averaged: " + str(mit_sector_umm_end - mit_sector_umm_start) + " seconds")
+
 # solve Madsen-BEM though MITRotor - rotor averaged
 # bem_rotor_madesen = BEM(
 #         rotor=IEA15MW(),
