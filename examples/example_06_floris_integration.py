@@ -19,7 +19,7 @@ from floris import FlorisModel, TimeSeries
 # MITRotor / UMM Imports
 from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, default_bem_factory, default_pitch_interp, default_tsr_interp
 from MITRotor.ReferenceTurbines import IEA15MW
-from MITRotor.Momentum import UnifiedMomentum, MadsenMomentum
+from MITRotor.Momentum import UnifiedMomentum, UnifiedMomentumLUT
 from MITRotor.Geometry import BEMGeometry
 from MITRotor.TipLoss import NoTipLoss
 from MITRotor.BEMSolver import BEM
@@ -131,46 +131,33 @@ mit_Cp_annulus_umm = mit_sols_annulus_umm.Cp()
 print("MITRotor UMM-BEM Annulus-Averaged: " + str(mit_annulus_umm_end - mit_annulus_umm_start) + " seconds")
 
 # solve UMM-BEM though MITRotor - sector averaged
-bem_sector_umm = BEM(
-        rotor=IEA15MW(),
-        momentum_model=UnifiedMomentum(averaging="sector"),
-        geometry=BEMGeometry(Nr=10, Ntheta=20),
-        tiploss_model=NoTipLoss(),
-    )
-mit_sector_umm_start = time.time()
-mit_sols_sector_umm = bem_sector_umm(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
-mit_sector_umm_end = time.time()
-mit_Ct_sector_umm = mit_sols_sector_umm.Ct()
-mit_Cp_sector_umm = mit_sols_sector_umm.Cp()
-print("MITRotor UMM-BEM Sector-Averaged: " + str(mit_sector_umm_end - mit_sector_umm_start) + " seconds")
-
-# solve Madsen-BEM though MITRotor - rotor averaged
-# bem_rotor_madesen = BEM(
+# bem_sector_umm = BEM(
 #         rotor=IEA15MW(),
-#         momentum_model=MadsenMomentum(averaging="rotor"),
+#         momentum_model=UnifiedMomentum(averaging="sector"),
 #         geometry=BEMGeometry(Nr=10, Ntheta=20),
-#         tiploss_model=NoTipLoss()
+#         tiploss_model=NoTipLoss(),
 #     )
-# mit_rotor_madsen_start = time.time()
-# mit_sols_rotor_madsen = [bem_rotor_madesen(pitch=np.deg2rad(pitch_interp(u)), tsr=tsr_interp(u), yaw=0, tilt=0) for u in wind_speeds]
-# mit_rotor_madsen_end = time.time()
-# mit_Ct_rotor_madsen = [sol.Ct() for sol in mit_sols_rotor_madsen]
-# mit_Cp_rotor_madsen = [sol.Cp() for sol in mit_sols_rotor_madsen]
-# print("MITRotor Madsen-BEM Rotor-Averaged: " + str(mit_rotor_madsen_end - mit_rotor_madsen_start) + " seconds")
+# mit_sector_umm_start = time.time()
+# mit_sols_sector_umm = bem_sector_umm(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
+# mit_sector_umm_end = time.time()
+# mit_Ct_sector_umm = mit_sols_sector_umm.Ct()
+# mit_Cp_sector_umm = mit_sols_sector_umm.Cp()
+# print("MITRotor UMM-BEM Sector-Averaged: " + str(mit_sector_umm_end - mit_sector_umm_start) + " seconds")
 
-# # solve Madsen-BEM though MITRotor - annulus averaged
-# bem_annulus_madesen = BEM(
-#         rotor=IEA15MW(),
-#         momentum_model=MadsenMomentum(averaging="annulus"),
-#         geometry=BEMGeometry(Nr=10, Ntheta=20),
-#         tiploss_model=NoTipLoss()
-#     )
-# mit_annulus_madsen_start = time.time()
-# mit_sols_annulus_madsen = [bem_annulus_madesen(pitch=np.deg2rad(pitch_interp(u)), tsr=tsr_interp(u), yaw=0, tilt=0) for u in wind_speeds]
-# mit_annulus_madsen_end = time.time()
-# mit_Ct_annulus_madsen = [sol.Ct() for sol in mit_sols_annulus_madsen]
-# mit_Cp_annulus_madsen = [sol.Cp() for sol in mit_sols_annulus_madsen]
-# print("MITRotor Madsen-BEM Annulus-Averaged: " + str(mit_annulus_madsen_end - mit_annulus_madsen_start) + " seconds")
+# solve UMM-BEM with LUT though MITRotor - annulus averaged
+print("Making LUT!")
+bem_annulus_umm_LUT = BEM(
+    rotor=IEA15MW(),
+    momentum_model=UnifiedMomentumLUT(averaging="annulus", cache_fn = Path("cache")/ "lut.csv"),
+    geometry=BEMGeometry(Nr=10, Ntheta=20),
+    tiploss_model=NoTipLoss(),
+)
+mit_annulus_umm_LUT_start = time.time()
+mit_sols_annulus_umm_LUT = bem_annulus_umm_LUT(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
+mit_annulus_umm_LUT_end = time.time()
+mit_Ct_annulus_umm_LUT = mit_sols_annulus_umm_LUT.Ct()
+mit_Cp_annulus_umm_LUT = mit_sols_annulus_umm_LUT.Cp()
+print("MITRotor UMM-BEM LUT Annulus-Averaged: " + str(mit_annulus_umm_LUT_end - mit_annulus_umm_LUT_start) + " seconds")
 
 # solve FLORIS  with UMM-BEM though MITRotor - rotor averaged
 time_series = TimeSeries(
@@ -202,212 +189,188 @@ floris_power_annulus_umm = np.squeeze(fmodel_annulus_umm.get_turbine_powers())
 floris_Cp_annulus_umm =  floris_power_annulus_umm / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
 print("FLORIS UMM-BEM Annulus-Averaged: " + str(floris_annulus_umm_end - floris_annulus_umm_start) + " seconds")
 
-# solve FLORIS  with Madsen-BEM though MITRotor - rotor averaged
-# fmodel_rotor_madsen = FlorisModel("defaults")
-# fmodel_rotor_madsen.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
-# fmodel_rotor_madsen.set_operation_model(MITRotorTurbine(bem_model = bem_rotor_madesen)) # default bem_model uses rotor-averaging
-# floris_rotor_madsen_start = time.time()
-# fmodel_rotor_madsen.run()
-# floris_rotor_madsen_end = time.time()
-# floris_Ct_rotor_madsen = fmodel_rotor_madsen.get_turbine_thrust_coefficients()
-# floris_power_rotor_madsen = np.squeeze(fmodel_rotor_madsen.get_turbine_powers())
-# floris_Cp_rotor_madsen =  floris_power_rotor_madsen / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
-# print("FLORIS Madsen-BEM Rotor-Averaged: " + str(floris_rotor_madsen_end - floris_rotor_madsen_start) + " seconds")
+# solve FLORIS  with UMM-BEM with LUT though MITRotor - annulus averaged
+fmodel_annulus_umm_LUT = FlorisModel("defaults")
+fmodel_annulus_umm_LUT.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
+fmodel_annulus_umm_LUT.set_operation_model(MITRotorTurbine(bem_model = bem_annulus_umm_LUT)) # default bem_model uses rotor-averaging
+floris_annulus_umm_LUT_start = time.time()
+fmodel_annulus_umm_LUT.run()
+floris_annulus_umm_LUT_end = time.time()
+floris_Ct_annulus_umm_LUT = fmodel_annulus_umm_LUT.get_turbine_thrust_coefficients()
+floris_power_annulus_umm_LUT = np.squeeze(fmodel_annulus_umm_LUT.get_turbine_powers())
+floris_Cp_annulus_umm_LUT =  floris_power_annulus_umm_LUT / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
+print("FLORIS UMM-BEM LUT Annulus-Averaged: " + str(floris_annulus_umm_LUT_end - floris_annulus_umm_LUT_start) + " seconds")
 
-# # solve FLORIS  with Madsen-BEM though MITRotor - annulus averaged
-# fmodel_annulus_madsen = FlorisModel("defaults")
-# fmodel_annulus_madsen.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
-# fmodel_annulus_madsen.set_operation_model(MITRotorTurbine(bem_model = bem_annulus_madesen)) # default bem_model uses rotor-averaging
-# floris_annulus_madsen_start = time.time()
-# fmodel_annulus_madsen.run()
-# floris_annulus_madsen_end = time.time()
-# floris_Ct_annulus_madsen = fmodel_annulus_madsen.get_turbine_thrust_coefficients()
-# floris_power_annulus_madsen = np.squeeze(fmodel_annulus_madsen.get_turbine_powers())
-# floris_Cp_annulus_madsen =  floris_power_annulus_madsen / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
-# print("FLORIS Madsen-BEM Annulus-Averaged: " + str(floris_annulus_madsen_end - floris_annulus_madsen_start) + " seconds")
+# Presentation-friendly typography
+plt.rcParams.update({
+    "font.size": 20,
+    "axes.titlesize": 20,
+    "axes.labelsize": 22,
+    "xtick.labelsize": 20,
+    "ytick.labelsize": 20,
+})
 
 # plot CT values against one another and against IEA15MW from figure 3.1-C (https://docs.nrel.gov/docs/fy20osti/75698.pdf)
-fig, (ax0, ax1) = plt.subplots(figsize=(16, 8), ncols = 2, sharex = True, sharey = True)
-fig.suptitle("IEA 15 MW FLORIS Interface Validation", size = 18)
-alpha = 0.8
+fig, (ax0, ax1) = plt.subplots(figsize=(17, 9), ncols = 2, sharex = True, sharey = True)
+fig.suptitle("IEA 15 MW FLORIS Interface Validation")
+alpha = 0.6
 ax0.plot(
     wind_table,
     df["Thrust Coefficient [-]"].to_list(),
-    linewidth=4,
+    linewidth=6,
     label="IEA15MW",
     color='tab:orange',
     linestyle = "solid",
     alpha = alpha,
+    zorder = 1,
 )
 
 ax0.plot(
     wind_speeds,
     mit_Ct_rotor_umm,
     label="MITRotor UMM Rotor-Averaged",
-    linewidth=4,
+    linewidth=6,
     color='tab:blue',
     linestyle = "solid",
     alpha = alpha,
+    zorder = 1,
 )
+ax0.plot(
+    wind_speeds,
+    mit_Ct_annulus_umm_LUT,
+    label="MITRotor UMM LUT Annulus-Averaged",
+    linewidth=6,
+    color='tab:red',
+    linestyle = "solid",
+    alpha = alpha,
+    zorder = 1,
+)
+
 ax0.plot(
     wind_speeds,
     mit_Ct_annulus_umm,
     label="MITRotor UMM Annulus-Averaged",
-    linewidth=4,
+    linewidth=6,
     color='tab:green',
     linestyle = "solid",
     alpha = alpha,
+    zorder = 1,
 )
-# ax0.plot(
-#     wind_speeds,
-#     mit_Ct_rotor_madsen,
-#     label="MITRotor Madsen Rotor-Averaged",
-#     linewidth=4,
-#     color='tab:purple',
-#     linestyle = "solid",
-#     alpha = alpha,
-# )
-# ax0.plot(
-#     wind_speeds,
-#     mit_Ct_annulus_madsen,
-#     label="MITRotor Madsen Annulus-Averaged",
-#     linewidth=4,
-#     color='tab:red',
-#     linestyle = "solid",
-#     alpha = alpha,
-# )
-ax0.plot(
+
+ax0.scatter(
     wind_speeds,
     floris_Ct_rotor_umm,
     label="FLORIS-MITRotor UMM Rotor-Averaged",
-    linewidth=4,
     color='tab:blue',
-    linestyle = "dashed",
     alpha = alpha,
+    marker = "o",
+    zorder = 2,
+    s = 80,
 )
-ax0.plot(
+ax0.scatter(
     wind_speeds,
     floris_Ct_annulus_umm,
     label="FLORIS-MITRotor UMM Annulus-Averaged",
-    linewidth=4,
     color='tab:green',
-    linestyle = "dashed",
     alpha = alpha,
+    zorder = 2,
+    s = 80,
+    marker = "s"
+)
+ax0.scatter(
+    wind_speeds,
+    floris_Ct_annulus_umm_LUT,
+    label="FLORIS-MITRotor UMM LUT Annulus-Averaged",
+    color='tab:red',
+    alpha = alpha,
+    zorder = 2,
+    s = 80,
+    marker = "v"
 )
 
-# ax0.plot(
-#     wind_speeds,
-#     floris_Ct_rotor_madsen,
-#     label="FLORIS-MITRotor Madsen Rotor-Averaged",
-#     linewidth=4,
-#     color='tab:purple',
-#     linestyle = "dashed",
-#     alpha = alpha,
-# )
-# ax0.plot(
-#     wind_speeds,
-#     floris_Ct_annulus_madsen,
-#     label="FLORIS-MITRotor Madsen Annulus-Averaged",
-#     linewidth=4,
-#     color='tab:red',
-#     linestyle = "dashed",
-#     alpha = alpha,
-# )
-
-ax0.set_xlabel("Wind Speed [m/s]", size = 16)
-ax0.set_ylabel("$C_T$", size = 16)
-ax0.tick_params(labelsize = 14)
-ax0.set_title("$C_T$", size = 18)
+ax0.set_xlabel("Wind Speed [m/s]")
+ax0.set_ylabel("$C_T$")
+ax0.tick_params()
+ax0.set_title("$C_T$")
 
 # plot Cp values against one another and against IEA15MW from figure 3.1-C (https://docs.nrel.gov/docs/fy20osti/75698.pdf)
 ax1.plot(
     wind_table,
     df["Aero Power Coefficient [-]"].to_list(),
     label="IEA15MW",
-    linewidth=4,
+    linewidth=6,
     color='tab:orange',
     linestyle = "solid",
     alpha = alpha,
+    zorder = 1
 )
 ax1.plot(
     wind_speeds,
     mit_Cp_rotor_umm,
     label="MITRotor UMM Rotor-Averaged",
-    linewidth=4,
+    linewidth=6,
     color='tab:blue',
     linestyle = "solid",
     alpha = alpha,
+    zorder = 1
+)
+ax1.plot(
+    wind_speeds,
+    mit_Cp_annulus_umm_LUT,
+    label="MITRotor UMM LUT Annulus-Averaged",
+    linewidth=6,
+    color='tab:red',
+    linestyle = "solid",
+    alpha = alpha,
+    zorder = 1
 )
 ax1.plot(
     wind_speeds,
     mit_Cp_annulus_umm,
     label="MITRotor UMM Annulus-Averaged",
-    linewidth=4,
+    linewidth=6,
     color='tab:green',
     linestyle = "solid",
     alpha = alpha,
+    zorder = 1
 )
-# ax1.plot(
-#     wind_speeds,
-#     mit_Cp_rotor_madsen,
-#     label="MITRotor Madsen Rotor-Averaged",
-#     linewidth=4,
-#     color='tab:purple',
-#     linestyle = "solid",
-#     alpha = alpha,
-# )
-# ax1.plot(
-#     wind_speeds,
-#     mit_Cp_annulus_madsen,
-#     label="MITRotor Madsen Annulus-Averaged",
-#     linewidth=4,
-#     color='tab:red',
-#     linestyle = "solid",
-#     alpha = alpha,
-# )
-ax1.plot(
+
+ax1.scatter(
     wind_speeds,
     floris_Cp_rotor_umm,
     label="FLORIS-MITRotor UMM Rotor-Averaged",
-    linewidth=4,
     color='tab:blue',
-    linestyle = "dashed",
+    marker = "o",
     alpha = alpha,
+    s = 80,
+    zorder = 2
 )
-ax1.plot(
+ax1.scatter(
     wind_speeds,
     floris_Cp_annulus_umm,
     label="FLORIS-MITRotor UMM Annulus-Averaged",
-    linewidth=4,
     color='tab:green',
-    linestyle = "dashed",
+    marker = "s",
     alpha = alpha,
+    s = 80,
+    zorder = 2
 )
-# ax1.plot(
-#     wind_speeds,
-#     floris_Cp_rotor_madsen,
-#     label="FLORIS-MITRotor Madsen Rotor-Averaged",
-#     linewidth=4,
-#     color='tab:purple',
-#     linestyle = "dashed",
-#     alpha = alpha,
-# )
-# ax1.plot(
-#     wind_speeds,
-#     floris_Cp_annulus_madsen,
-#     label="FLORIS-MITRotor Madsen Annulus-Averaged",
-#     linewidth=4,
-#     color='tab:red',
-#     linestyle = "dashed",
-#     alpha = alpha,
-# )
+ax1.scatter(
+    wind_speeds,
+    floris_Cp_annulus_umm_LUT,
+    label="FLORIS-MITRotor UMM LUT Annulus-Averaged",
+    color='tab:red',
+    marker = "v",
+    alpha = alpha,
+    s = 80,
+    zorder = 2
+)
 
-ax1.set_xlabel("Wind Speed [m/s]", size = 16)
-ax1.set_ylabel("$C_P$", size = 16)
-ax1.tick_params(labelsize = 14)
-ax1.set_title("$C_P$", size = 18)
+ax1.set_xlabel("Wind Speed [m/s]")
+ax1.set_ylabel("$C_P$")
+ax1.set_title("$C_P$")
 ax1.legend(
-    fontsize=14,
+    fontsize=16,
     loc="upper right",
 )
 
