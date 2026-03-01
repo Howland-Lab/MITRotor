@@ -59,7 +59,7 @@ csv_file = os.path.join(module_dir, "..", "MITRotor", "FlorisInterface", "IEA_15
 df = pl.read_csv(csv_file)
 
 wind_table = df["Wind [m/s]"].to_numpy()
-wind_speeds = np.linspace(3, 25, 50)
+wind_speeds = np.linspace(5, 25, 20)
 wind_dirs = np.full_like(wind_speeds, 270.0)
 turbulence_intensity = np.zeros_like(wind_speeds)
 
@@ -104,6 +104,7 @@ plt.savefig(figdir / "example_5_pitch_tsr_interpolation.png", dpi=300)
 
 # -------- plot CT and CP values against one another and against IEA15MW from figure 3.1-C (https://docs.nrel.gov/docs/fy20osti/75698.pdf) -------
 # solve UMM-BEM though MITRotor - rotor averaged
+pitches_rad = np.deg2rad(pitches)
 bem_rotor_umm = default_bem_factory()
 mit_rotor_umm_start = time.time()
 pitches = np.deg2rad(pitch_interp(wind_speeds))
