@@ -10,20 +10,21 @@ import time
 from floris import FlorisModel, TimeSeries
 from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, default_bem_factory
 
-bem_rotor_umm = MITRotorTurbine()
+bem_rotor_umm = default_bem_factory()
 bem_annulus_umm_LUT = BEM(
     rotor=IEA15MW(),
     momentum_model=UnifiedMomentumLUT(averaging="annulus", cache_fn = Path("cache")/ "lut.csv"),
     geometry=BEMGeometry(Nr=10, Ntheta=20),
     tiploss_model=NoTipLoss(),
 )
+rotor_area = np.pi * bem_rotor_umm.rotor.R**2 
 
 bem_rotor_times = []
 bem_annulus_LUT_times = []
 wind_speeds_all = []
 bem_rotor_values = []
 bem_annulus_LUT_values = []
-ns = [5 * i for i in range(1, 20)]
+ns = [5 * i for i in range(1, 21)]
 for n in ns:
     print(f"{n} wind speeds")
     wind_speeds = np.linspace(5, 20, n)
@@ -41,15 +42,16 @@ for n in ns:
 
     fmodel_rotor_umm = FlorisModel("defaults")
     fmodel_rotor_umm.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
-    fmodel_rotor_umm.set_operation_model(bem_rotor_umm) # default bem_model uses rotor-averaging
+    fmodel_rotor_umm.set_operation_model(MITRotorTurbine(bem_model = bem_rotor_umm)) # default bem_model uses rotor-averaging
     floris_rotor_umm_start = time.time()
     fmodel_rotor_umm.run()
     floris_rotor_umm_end = time.time()
     dt_rotor = floris_rotor_umm_end - floris_rotor_umm_start
     print("FLORIS UMM-BEM Rotor-Averaged: " + str(dt_rotor) + " seconds")
     bem_rotor_times.append(dt_rotor)
+    floris_Cp_rotor_umm =  np.squeeze(fmodel_rotor_umm.get_turbine_powers()) / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
     bem_rotor_values.extend(
-        np.squeeze(fmodel_rotor_umm.get_turbine_powers())
+        np.squeeze(floris_Cp_rotor_umm)
     )
 
     # solve FLORIS  with UMM-BEM with LUT though MITRotor - annulus averaged
@@ -62,11 +64,13 @@ for n in ns:
     dt_annulus_LUT = floris_annulus_umm_LUT_end - floris_annulus_umm_LUT_start
     print("FLORIS UMM-BEM LUT Annulus-Averaged: " + str(dt_annulus_LUT) + " seconds")
     bem_annulus_LUT_times.append(dt_annulus_LUT)
+    floris_Cp_annulus_umm_LUT =  np.squeeze(fmodel_annulus_umm_LUT.get_turbine_powers()) / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
     bem_annulus_LUT_values.extend(
-        np.squeeze(fmodel_annulus_umm_LUT.get_turbine_powers())
+        np.squeeze(floris_Cp_annulus_umm_LUT)
     )
 
 # make timing CSV
+vectorized = True
 rows = []
 
 for n, dt in zip(ns, bem_rotor_times):
@@ -74,7 +78,7 @@ for n, dt in zip(ns, bem_rotor_times):
         "n_wind_speeds": n,
         "runtime_seconds": dt,
         "model": "rotor_umm",
-        "vectorized": True
+        "vectorized": vectorized
     })
 
 for n, dt in zip(ns, bem_annulus_LUT_times):
@@ -82,7 +86,7 @@ for n, dt in zip(ns, bem_annulus_LUT_times):
         "n_wind_speeds": n,
         "runtime_seconds": dt,
         "model": "annulus_lut",
-        "vectorized": True
+        "vectorized": vectorized
     })
 
 df = pd.DataFrame(rows)
@@ -94,31 +98,31 @@ if csv_path.exists():
 else:
     df.to_csv(csv_path, index=False)
 
-# make value CSVs
+# make values CSV
 rows = []
-
+# Rotor
 for wind, val in zip(wind_speeds_all, bem_rotor_values):
     rows.append({
         "wind_speed": wind,
         "power": val,
         "model": "rotor_umm",
-        "vectorized": True
+        "vectorized": vectorized
     })
 
-for wind, val in zip(ns, bem_annulus_LUT_values):
+# Annulus LUT
+for wind, val in zip(wind_speeds_all, bem_annulus_LUT_values):
     rows.append({
         "wind_speed": wind,
         "power": val,
-        "model": "rotor_umm",
-        "vectorized": True
+        "model": "annulus_lut",
+        "vectorized": vectorized
     })
 
 df = pd.DataFrame(rows)
 
-csv_path = Path("cache")/ "value_results.csv"
+csv_path = Path("cache") / "value_results.csv"
 
 if csv_path.exists():
     df.to_csv(csv_path, mode="a", header=False, index=False)
 else:
     df.to_csv(csv_path, index=False)
-
