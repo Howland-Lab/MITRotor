@@ -40,7 +40,7 @@ label_order = [
 ]
 
 # ---- Plot ----
-plt.figure(figsize=(8, 6))
+plt.figure(figsize=(6, 4))
 
 for label in label_order:
     group = df_avg[df_avg["label"] == label]
@@ -53,9 +53,11 @@ for label in label_order:
         marker="o",
         capsize=3,
         label=label,
+        linewidth = 2,
     )
+    # plt.yscale("log")
 
-plt.xlabel("Number of Wind Speeds")
+plt.xlabel("Number of Wind Speeds Run\n(evenly-spaced between 5-20 m/s)")
 plt.ylabel("Runtime (seconds)")
 plt.title("Runtime vs Number of Wind Speeds")
 plt.legend()
@@ -66,32 +68,27 @@ plt.savefig(figdir / "example_timings.png", dpi=300)
 #------------------------------------
 # Value plot
 #------------------------------------
-plt.figure(figsize=(8, 6))
+plt.figure(figsize=(6, 4))
 
-df_avg = (
-    value_df.groupby(["wind_speed", "model", "vectorized"], as_index=False)
-      .agg(
-          power_mean=("power", "mean"),
-          power_std=("power", "std"),
-      )
-)
-df_avg["label"] = df_avg.apply(make_label, axis=1)
+value_df["label"] = value_df.apply(make_label, axis=1)
 
 for label in label_order:
-    group = df_avg[df_avg["label"] == label]
+    group = value_df[value_df["label"] == label]
     group = group.sort_values("wind_speed")
-
-    plt.errorbar(
+    is_vectorized = group["vectorized"].iloc[0]
+    linestyle = "dashed" if is_vectorized else "solid"
+    zorder = 2 if is_vectorized else 1
+    plt.plot(
         group["wind_speed"],
-        group["power_mean"],
-        yerr=group["power_std"],
-        marker="o",
-        capsize=3,
+        group["power"],
+        linewidth = 3,
         label=label,
+        linestyle = linestyle,
+        zorder = zorder,
     )
 
-plt.xlabel("Wind Speed")
-plt.ylabel("Coefficent of Power $C_P$")
+plt.xlabel("Wind Speed [m/s]")
+plt.ylabel("Coefficent of Power ($C_P$)")
 plt.title("$C_P$ vs Wind Speed")
 plt.legend()
 plt.grid(True)
