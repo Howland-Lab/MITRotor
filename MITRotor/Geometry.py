@@ -54,27 +54,28 @@ class BEMGeometry:
     
 
 def expand_geometry(x):
+    x = np.atleast_1d(x)
     if x.ndim < 3:
         return x[None, ...]
     else:
         return x
 
 def expand_to_Nr_Ntheta(x):
-    x = np.asarray(x)
+    x = np.atleast_1d(x)
     if x.ndim < 3:
         return x[:, None, None]
     else:
         return x
     
 def expand_to_Nr(x):
-    x = np.asarray(x)
+    x = np.atleast_1d(x)
     if x.ndim < 2:
         return x[:, None]
     else:
         return x
     
 def expand_to_Ntheta(x):
-    x = np.asarray(x)
+    x = np.atleast_1d(x)
     if x.ndim < 3:
         return x[:, :, None]
     else:

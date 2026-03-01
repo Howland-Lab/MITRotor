@@ -171,16 +171,19 @@ class BEM:
     
     def pre_process(self, pitch, tsr, yaw = 0, tilt = 0, **kwargs):
         # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
+        yaw, tilt = np.asarray(yaw), np.asarray(tilt)
+        yaw, tilt = np.broadcast_arrays(yaw, tilt)
         eff_yaw = calc_eff_yaw(yaw, tilt)
         # initialize dtheta
-        dtheta = np.zeros_like(yaw)
+        dtheta = np.zeros_like(eff_yaw, dtype=float)
         # masks
         yaw_zero = (yaw == 0)
-        not_tilt_zero = ~(tilt == 0)
+        not_tilt_zero = np.logical_not(tilt == 0)
         # case1: yaw == 0 and tilt != 0
-        dtheta[yaw_zero & not_tilt_zero] = np.pi / 2
+        case1 = yaw_zero & not_tilt_zero
+        dtheta[case1] = np.pi / 2
         # case2: yaw != 0 and tilt != 0
-        case2 = ~yaw_zero & not_tilt_zero
+        case2 = np.logical_not(yaw_zero) & not_tilt_zero
         dtheta[case2] = np.arccos(
             np.sin(yaw[case2]) / np.sin(eff_yaw[case2])
         )

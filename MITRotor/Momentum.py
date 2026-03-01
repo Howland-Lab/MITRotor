@@ -7,6 +7,7 @@ from numpy.typing import ArrayLike
 from MITRotor.CachedLUT import CachedLUT
 from pathlib import Path
 from UnifiedMomentumModel import Momentum as UMM
+from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw, eff_yaw_inv_rotation
 from .Geometry import expand_to_Nr_Ntheta, expand_to_Nr, expand_to_Ntheta
 
 if TYPE_CHECKING:

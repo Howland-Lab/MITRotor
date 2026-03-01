@@ -100,7 +100,7 @@ ax.set_title("IEA 15MW: Fixed Bottom Trajectories", size = 18)
 ax.set_xlabel("Wind Speed [m/s]", size = 16)
 ax.tick_params(labelsize=14)
 ax.legend(fontsize = 14)
-plt.savefig(figdir / "example_5_pitch_tsr_interpolation.png", dpi=300)
+plt.savefig(figdir / "example_6_pitch_tsr_interpolation.png", dpi=300)
 
 # -------- plot CT and CP values against one another and against IEA15MW from figure 3.1-C (https://docs.nrel.gov/docs/fy20osti/75698.pdf) -------
 # solve UMM-BEM though MITRotor - rotor averaged
@@ -411,4 +411,4 @@ ax1.legend(
     loc="upper right",
 )
 
-plt.savefig(figdir / "example_5_IEA15mw_CT_CP.png", dpi=300)
+plt.savefig(figdir / "example_6_IEA15mw_CT_CP.png", dpi=300)
