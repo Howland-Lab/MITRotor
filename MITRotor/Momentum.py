@@ -298,9 +298,9 @@ class UnifiedMomentum(MomentumModel):
 
 
 # Look-up table for unified model
-def func_Ct(x) -> dict:
+def func_Ct(x, beta, cached) -> dict:
     Ct, eff_yaw = x
-    model_Ct = UMM.ThrustBasedUnified()
+    model_Ct = UMM.ThrustBasedUnified(beta = beta, cached=cached)
     sol = model_Ct(Ct, np.deg2rad(np.round(eff_yaw, 2)))
     return dict(
         Ct=Ct,
@@ -334,10 +334,14 @@ class ThrustBasedUnifiedLUT(CachedLUT, UMM.MomentumBase):
             as described in UMM documentation, yaw and tilt can be combined into an "effective yaw"
             the cache uses effective yaw, so these values should cover the range of effective yaws you
             want. You can use UnifiedMomentumModel.Utilities.Geometry.calc_eff_yaw to find
+        - beta (float, optional) - used in UMM
+        - cached (boolean, optional) - cache nonlinear pressure in UMM
     """
     def __init__(self, cache_fn: Path = CACHE_FN_CT, regenerate=False, s=0.025,
-                LUT_Cts=None, LUT_yaws=None,
+                LUT_Cts=None, LUT_yaws=None, beta=0.1403, cached=True,
     ):
+        self._beta = beta
+        self._nlp_cached = cached
         # set reasonable CT and eff_yaw range
         self._Cts = LUT_Cts if LUT_Cts is not None else np.linspace(-1, 1.5, 100)
         self._eff_yaws = LUT_yaws if LUT_yaws is not None else np.arange(-50.0, 50.1, 2.0)
@@ -356,7 +360,7 @@ class ThrustBasedUnifiedLUT(CachedLUT, UMM.MomentumBase):
         # Run unified model and variations
         results = []
         for param in params:  # this can use the vectorization once branches are merged!
-            results.append(func_Ct(param))
+            results.append(func_Ct(param, beta = self._beta, cached = self._nlp_cached))
         return pl.from_dicts(results).unique(["Ct", "eff_yaw"])
 
     def __call__(self, Ct: ArrayLike, yaw: ArrayLike, tilt: ArrayLike = 0) -> UMM.MomentumSolution:
