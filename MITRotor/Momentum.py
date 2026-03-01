@@ -188,8 +188,8 @@ class MadsenMomentum(MomentumModel):
 
 
     def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+        # if tilt != 0:
+            # raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         if self.cosine_exponent:
             Ct = Cx / (np.cos(yaw)**2)
         else:
