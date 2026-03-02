@@ -84,7 +84,7 @@ class BladeAirfoils:
     def Cd(self, x, inflow):
         return self.cd_interp(x, inflow, grid=False)
 
-    def __call__(self, x, inflow, apply_3D_stall_correction=False, c_on_r=None, twist=None):
+    def __call__(self, x, inflow, apply_3D_stall_correction=False, c_on_r=None, tsr=None):
         '''
         Inputs:
             - x: radial position normalized by rotor radius (mu)
@@ -103,19 +103,24 @@ class BladeAirfoils:
         m = self.m_interp(x)
 
         if apply_3D_stall_correction:
-            # Apply 3D stall correction (Hansen 2000)
-            a = 2.2
-            h = 1
-            n = 4
+            # Apply 3D stall correction (Du and Selig 1998)
+            tsr_mod = tsr / np.sqrt(1 + tsr**2)
+            a = 1
+            b = 1
+            d = 1
+            exp1 = np.minimum((d/(tsr_mod * x + 1e-3)), 10)
 
-            Cl_linear = m * (inflow - alpha_0)
-
-            f = a * (c_on_r ** h) * (np.cos(twist) ** n)
-
-            delta_cl = f * (Cl_linear - Cl_2D)
-
-            Cl_3D = Cl_2D + delta_cl
-            Cd_3D = Cd_2D  
+            fl = (
+                    (1 / (m)) * 
+                    ((1.6 * c_on_r / 0.1267) * 
+                    ((a - c_on_r**exp1) / 
+                    (b + c_on_r**exp1)) - 1)
+                )
+            
+            Clp = m * (inflow - alpha_0)
+            del_Cl = np.maximum(0, fl * (Clp - Cl_2D))
+            Cl_3D = Cl_2D + del_Cl
+            Cd_3D = Cd_2D
 
             return Cl_3D, Cd_3D
         
@@ -213,8 +218,7 @@ class RotorDefinition:
     def solidity(self, mu):
         return self.solidity_func(mu)
 
-    def clcd(self, mu, aoa, apply_3D_stall_correction=False):
+    def clcd(self, mu, aoa, apply_3D_stall_correction=False, tsr = None):
         solidity = self.solidity(mu)
         c_on_r = solidity * (2 * np.pi) / (self.N_blades)
-        twist = self.twist(mu)
-        return self.airfoil_func(mu, aoa, apply_3D_stall_correction, c_on_r, twist)
+        return self.airfoil_func(mu, aoa, apply_3D_stall_correction, c_on_r=c_on_r, tsr=tsr)

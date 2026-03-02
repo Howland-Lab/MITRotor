@@ -219,7 +219,7 @@ class KraghAerodynamics(AerodynamicModel):
         aoa = phi - rotor.twist(geom.mu_mesh) - pitch
         aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
 
-        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa, apply_3D_stall_correction=self.apply_3D_stall_correction)
+        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa, apply_3D_stall_correction=self.apply_3D_stall_correction, tsr=tsr)
 
         solidity = rotor.solidity(geom.mu_mesh)
 
@@ -287,7 +287,7 @@ class DefaultAerodynamics(AerodynamicModel):
         aoa = phi - rotor.twist(geom.mu_mesh) - pitch
         aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
 
-        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa, apply_3D_stall_correction=self.apply_3D_stall_correction)
+        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa, apply_3D_stall_correction=self.apply_3D_stall_correction, tsr=tsr)
 
         solidity = rotor.solidity(geom.mu_mesh)
 
