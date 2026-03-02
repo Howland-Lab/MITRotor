@@ -55,14 +55,74 @@ class BladeAirfoils:
         self.cl_interp = interpolate.RectBivariateSpline(airfoil_grid, aoa_grid, cl)
         self.cd_interp = interpolate.RectBivariateSpline(airfoil_grid, aoa_grid, cd)
 
+        self.m, self.alpha_0 = self.compute_lift_slope(aoa_grid, cl)
+
+        self.m_interp = interpolate.interp1d(airfoil_grid, self.m, fill_value="extrapolate")
+        self.alpha_0_interp = interpolate.interp1d(airfoil_grid, self.alpha_0, fill_value="extrapolate")
+
+    def compute_lift_slope(self, alpha_rad, cl):
+        """
+        Fit lift slope in linear region (e.g., -4° to +4°)
+        alpha_rad: array of AoA in radians
+        Cl: corresponding Cl values
+        """
+        m_vals = []
+        alpha0_vals = []
+        for cl_i in cl:
+            mask = (alpha_rad > np.radians(-4)) & (alpha_rad < np.radians(4))
+            p = np.polyfit(alpha_rad[mask], cl_i[mask], 1)
+            m = p[0]          # dCl/dα
+            alpha0 = 0 if m < 0.01 else -p[1]/p[0]
+            m_vals.append(m)
+            alpha0_vals.append(alpha0)
+        return np.array(m_vals), np.array(alpha0_vals)
+
+
     def Cl(self, x, inflow):
         return self.cl_interp(x, inflow, grid=False)
 
     def Cd(self, x, inflow):
         return self.cd_interp(x, inflow, grid=False)
 
-    def __call__(self, x, inflow):
-        return self.Cl(x, inflow), self.Cd(x, inflow)
+    def __call__(self, x, inflow, apply_3D_stall_correction=False, c_on_r=None, twist=None):
+        '''
+        Inputs:
+            - x: radial position normalized by rotor radius (mu)
+            - inflow: angle of attack (radians)
+            - apply_3D_stall_correction: whether to apply 3D stall correction (Hansen 2000)
+            - c_on_r: chord-to-radius ratio (only needed if apply_3D_stall_correction=True)
+            - twist: local twist angle (radians, only needed if apply_3D_stall_correction=True)
+            
+        Returns:
+            - Cl, Cd with optional 3D stall correction applied
+        '''
+        Cl_2D = self.Cl(x, inflow)
+        Cd_2D = self.Cd(x, inflow)
+
+        alpha_0 = self.alpha_0_interp(x)
+        m = self.m_interp(x)
+
+        if apply_3D_stall_correction:
+            # Apply 3D stall correction (Hansen 2000)
+            a = 2.2
+            h = 1
+            n = 4
+
+            Cl_linear = m * (inflow - alpha_0)
+
+            f = a * (c_on_r ** h) * (np.cos(twist) ** n)
+
+            delta_cl = f * (Cl_linear - Cl_2D)
+
+            Cl_3D = Cl_2D + delta_cl
+            Cd_3D = Cd_2D  
+
+            return Cl_3D, Cd_3D
+        
+        else:
+            # No 3D stall correction
+            return Cl_2D, Cd_2D
+
 
 
 class RotorDefinition:
@@ -153,5 +213,8 @@ class RotorDefinition:
     def solidity(self, mu):
         return self.solidity_func(mu)
 
-    def clcd(self, mu, aoa):
-        return self.airfoil_func(mu, aoa)
+    def clcd(self, mu, aoa, apply_3D_stall_correction=False):
+        solidity = self.solidity(mu)
+        c_on_r = solidity * (2 * np.pi) / (self.N_blades)
+        twist = self.twist(mu)
+        return self.airfoil_func(mu, aoa, apply_3D_stall_correction, c_on_r, twist)

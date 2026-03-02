@@ -122,6 +122,10 @@ class AerodynamicProperties:
 
 
 class AerodynamicModel(ABC):
+    def __init__(self, apply_3D_stall_correction: bool = False):
+        self.apply_3D_stall_correction = apply_3D_stall_correction
+    
+    
     @abstractmethod
     def __call__(
         self,
@@ -215,7 +219,7 @@ class KraghAerodynamics(AerodynamicModel):
         aoa = phi - rotor.twist(geom.mu_mesh) - pitch
         aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
 
-        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
+        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa, apply_3D_stall_correction=self.apply_3D_stall_correction)
 
         solidity = rotor.solidity(geom.mu_mesh)
 
@@ -283,7 +287,7 @@ class DefaultAerodynamics(AerodynamicModel):
         aoa = phi - rotor.twist(geom.mu_mesh) - pitch
         aoa = np.clip(aoa, -np.pi / 2, np.pi / 2)
 
-        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa)
+        Cl, Cd = rotor.clcd(geom.mu_mesh, aoa, apply_3D_stall_correction=self.apply_3D_stall_correction)
 
         solidity = rotor.solidity(geom.mu_mesh)
 
