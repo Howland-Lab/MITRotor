@@ -89,9 +89,9 @@ class BladeAirfoils:
         Inputs:
             - x: radial position normalized by rotor radius (mu)
             - inflow: angle of attack (radians)
-            - apply_3D_stall_correction: whether to apply 3D stall correction (Hansen 2000)
+            - apply_3D_stall_correction: whether to apply 3D stall correction (Du and Selig 1998)
             - c_on_r: chord-to-radius ratio (only needed if apply_3D_stall_correction=True)
-            - twist: local twist angle (radians, only needed if apply_3D_stall_correction=True)
+            - tsr: tip-speed ratio (only needed if apply_3D_stall_correction=True)
             
         Returns:
             - Cl, Cd with optional 3D stall correction applied
