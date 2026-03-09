@@ -18,12 +18,13 @@ def test():
 
     aoa = np.radians(np.linspace(-5, 45, 100))
     mu = 0.3 * np.ones_like(aoa)
+    tsr = 5
 
     Cl_uncorr, Cd_uncorr = model.rotor.clcd(
-        mu, aoa, apply_3D_stall_correction=False
+        mu, aoa, apply_3D_stall_correction=False, tsr = tsr
     )
     Cl_corr, Cd_corr = model.rotor.clcd(
-        mu, aoa, apply_3D_stall_correction=True
+        mu, aoa, apply_3D_stall_correction=True, tsr = tsr
     )
 
 
