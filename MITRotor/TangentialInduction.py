@@ -57,7 +57,7 @@ class DefaultTangentialInduction(TangentialInductionModel):
         eff_yaw = calc_eff_yaw(yaw, tilt)
         aprime = (
             np.clip(aero_props.C_tau_corr, -2, 2)
-            / (4 * np.maximum(geom.mu_mesh, 0.1) ** 2 * tsr * (1 - aero_props.an) * np.cos(eff_yaw))
+            / (4 * np.maximum(geom.mu_mesh, 0.1) * tsr * (1 - aero_props.an) * np.cos(eff_yaw))
         )
 
         return aprime
