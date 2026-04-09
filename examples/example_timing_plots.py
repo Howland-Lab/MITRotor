@@ -23,9 +23,10 @@ def make_label(row):
     base = {
         "rotor_umm": "UMM Rotor-Averaged",
         "annulus_lut": "UMM LUT Annulus-Averaged",
+        "ref": "FLORIS Out of the Box"
     }[row["model"]]
 
-    if row["vectorized"]:
+    if row["vectorized"] and (row["model"] != "ref"):
         return base + " (Vectorized)"
     else:
         return base
@@ -37,14 +38,17 @@ label_order = [
     "UMM LUT Annulus-Averaged",
     "UMM Rotor-Averaged (Vectorized)",
     "UMM LUT Annulus-Averaged (Vectorized)",
+    "FLORIS Out of the Box",
 ]
 
 # ---- Plot ----
-plt.figure(figsize=(6, 4))
+plt.figure(figsize=(8, 4))
 
 for label in label_order:
+    print(label)
     group = df_avg[df_avg["label"] == label]
     group = group.sort_values("n_wind_speeds")
+    print(group["runtime_std"])
 
     plt.errorbar(
         group["n_wind_speeds"],
@@ -54,43 +58,46 @@ for label in label_order:
         capsize=3,
         label=label,
         linewidth = 2,
+        alpha = 0.5
     )
-    # plt.yscale("log")
+    plt.yscale("log")
 
 plt.xlabel("Number of Wind Speeds Run\n(evenly-spaced between 5-20 m/s)")
 plt.ylabel("Runtime (seconds)")
 plt.title("Runtime vs Number of Wind Speeds")
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
+# plt.legend()
+# plt.grid(True)
+# plt.tight_layout()
+plt.tight_layout(rect=[0, 0, 0.58, 1])
+plt.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
 plt.savefig(figdir / "example_timings.png", dpi=300)
 
 #------------------------------------
 # Value plot
 #------------------------------------
-plt.figure(figsize=(6, 4))
+# plt.figure(figsize=(6, 4))
 
-value_df["label"] = value_df.apply(make_label, axis=1)
+# value_df["label"] = value_df.apply(make_label, axis=1)
 
-for label in label_order:
-    group = value_df[value_df["label"] == label]
-    group = group.sort_values("wind_speed")
-    is_vectorized = group["vectorized"].iloc[0]
-    linestyle = "dashed" if is_vectorized else "solid"
-    zorder = 2 if is_vectorized else 1
-    plt.plot(
-        group["wind_speed"],
-        group["power"],
-        linewidth = 3,
-        label=label,
-        linestyle = linestyle,
-        zorder = zorder,
-    )
+# for label in label_order:
+#     group = value_df[value_df["label"] == label]
+#     group = group.sort_values("wind_speed")
+#     is_vectorized = group["vectorized"].iloc[0]
+#     linestyle = "dashed" if is_vectorized else "solid"
+#     zorder = 2 if is_vectorized else 1
+#     plt.plot(
+#         group["wind_speed"],
+#         group["power"],
+#         linewidth = 3,
+#         label=label,
+#         linestyle = linestyle,
+#         zorder = zorder,
+#     )
 
-plt.xlabel("Wind Speed [m/s]")
-plt.ylabel("Coefficent of Power ($C_P$)")
-plt.title("$C_P$ vs Wind Speed")
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-plt.savefig(figdir / "example_values.png", dpi=300)
+# plt.xlabel("Wind Speed [m/s]")
+# plt.ylabel("Coefficent of Power ($C_P$)")
+# plt.title("$C_P$ vs Wind Speed")
+# plt.legend()
+# plt.grid(True)
+# plt.tight_layout()
+# plt.savefig(figdir / "example_values.png", dpi=300)

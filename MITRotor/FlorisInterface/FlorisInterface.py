@@ -137,3 +137,11 @@ class MITRotorTurbine(BaseOperationModel):
     def axial_induction(self, **kwargs) -> NDArrayFloat:
         self._update_solution(**kwargs)
         return self._a
+    
+
+# Omega_tsr = lambda_opt * U / R
+
+# if Omega_tsr <= VS_maxspd:
+#     # Region 2
+# else:
+#     # Region 3

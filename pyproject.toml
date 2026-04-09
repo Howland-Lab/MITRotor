@@ -13,6 +13,7 @@ scipy = ">=1.6"
 unified-momentum-model = {git = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"}
 pyyaml = "^6.0.1"
 floris = {git = "https://github.com/misi9170/floris.git", branch = "feature/user-def-op-mod"}
+autograd = "^1.8.0"
 
 [tool.poetry.group.dev.dependencies]
 black = { extras = ["jupyter"], version = "^23.9.1" }

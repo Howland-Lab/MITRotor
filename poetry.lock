@@ -154,6 +154,25 @@ files = [
 ]
 
 [[package]]
+name = "autograd"
+version = "1.8.0"
+description = "Efficiently computes derivatives of NumPy code."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "autograd-1.8.0-py3-none-any.whl", hash = "sha256:4ab9084294f814cf56c280adbe19612546a35574d67c574b04933c7d2ecb7d78"},
+    {file = "autograd-1.8.0.tar.gz", hash = "sha256:107374ded5b09fc8643ac925348c0369e7b0e73bbed9565ffd61b8fd04425683"},
+]
+
+[package.dependencies]
+numpy = "<3"
+
+[package.extras]
+scipy = ["scipy"]
+test = ["pytest", "pytest-cov", "pytest-xdist"]
+
+[[package]]
 name = "babel"
 version = "2.18.0"
 description = "Internationalization utilities"
@@ -4191,4 +4210,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10, <3.15"
-content-hash = "0577e837066a12dcfc7e702c1fac22c2f7ffef58e19c837dc1fc791637a2b19e"
+content-hash = "41f31ab6f96a35586738f9d22f346efeb6dab52105cc5ab69e4e672301fe022c"
