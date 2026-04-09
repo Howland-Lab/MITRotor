@@ -40,53 +40,53 @@ class BEMGeometry:
         Z = self.mu_mesh * np.cos(self.theta_mesh)  # vertical
 
         return X, Y, Z
-
-    def annulus_average(self, X: ArrayLike):
-        # Take average over the theta values at a given radius
-        X_azim = 1 / (2 * np.pi) * np.trapezoid(X, self.theta_mesh, axis=get_theta_axis())
-        return X_azim
-
-    def rotor_average(self, X: ArrayLike):
-        # Takes annulus average quantities and averages over each radius
-        mu = expand_mu(self.mu)
-        X_rotor = 2 * np.trapezoid(X * mu, mu, axis=get_rad_axis())
-        return X_rotor
     
+# ---------- Function for averaging over the rotor ---------- #
 
-def expand_geometry(x):
+    def annulus_average(self, X):
+        X = np.asarray(X)
+        theta = np.asarray(self.theta).reshape(-1)
+        #Ensure last axis is Nθ
+        if X.shape[-1] != theta.shape[0]:
+            raise ValueError(f"Mismatch: X.shape={X.shape}, theta.shape={theta.shape}")
+        # Integrate over Nθ (last axis)
+        return (1 / (2 * np.pi)) * np.trapezoid(X, theta, axis=-1)
+
+    def rotor_average(self, X):
+        X = np.asarray(X)
+        mu = np.asarray(self.mu).reshape(-1)  # (Nr,)
+        # Ensure last axis is Nr
+        if X.shape[-1] != mu.shape[0]:
+            raise ValueError(f"Mismatch: X.shape={X.shape}, mu.shape={mu.shape}")
+        # Integrate over Nr (last axis)
+        return 2 * np.trapezoid(X * mu, mu, axis=-1)
+    
+# ---------- Function for adjusting axes for vectorization ---------- #
+
+def expand_to_Np(x):  # add setpoint axis
     x = np.atleast_1d(x)
     if x.ndim < 3:
         return x[None, ...]
     else:
         return x
 
-def expand_to_Nr_Ntheta(x):
+def expand_to_Nr_Ntheta(x):  # add Nr and Nθ axis
     x = np.atleast_1d(x)
     if x.ndim < 3:
         return x[:, None, None]
     else:
         return x
     
-def expand_to_Nr(x):
+def expand_to_Nr(x): # add Nr axis
     x = np.atleast_1d(x)
     if x.ndim < 2:
         return x[:, None]
     else:
         return x
     
-def expand_to_Ntheta(x):
+def expand_to_Ntheta(x): # add Nθ axis
     x = np.atleast_1d(x)
     if x.ndim < 3:
         return x[:, :, None]
     else:
         return x
-
-def expand_mu(mu):
-    return mu[None, :]
-
-def get_rad_axis(): # update these with expand_geometry and expand_to_Nr_Ntheta
-    return 1
-
-def get_theta_axis():
-    return 2
-

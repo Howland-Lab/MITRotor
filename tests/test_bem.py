@@ -6,7 +6,6 @@ from pytest import approx
 def test_IEA15MW():
     IEA15MW()
 
-
 def test_BEM_initialise():
     rotor = IEA15MW()
     BEM(rotor=rotor)
@@ -103,3 +102,58 @@ def test_model_yaw_tilt_rotor_phase():
         assert np.isclose(np.abs(theta_mesh[yaw_max_idx] - theta_mesh[tilt_max_idx]), np.pi / 2, atol = deg_atol)
         # yaw and evenly split yaw/tilt should be offset by 45 degrees
         assert np.isclose(np.abs(theta_mesh[yaw_max_idx] - theta_mesh[yaw_and_tilt_max_idx]), np.pi / 4, atol = deg_atol)
+
+def test_BEM_dimensionality():
+
+    rotor = IEA15MW()
+    bem = BEM(rotor=rotor)
+
+    # Scalars
+    pitch_s = 0.0
+    tsr_s   = 7.0
+    yaw_s   = 0.0
+    tilt_s  = 0.0
+
+    # Vectors (same length)
+    pitch_v = np.array([0.0, 0.1, 0.2])
+    tsr_v   = np.array([6.0, 7.0, 8.0])
+    yaw_v   = np.array([0.0, 0.1, 0.2])
+    tilt_v  = np.array([0.0, -0.1, -0.2])
+
+    # Mixed scalar + vector cases
+    cases = [
+        (pitch_s, tsr_s, yaw_s, tilt_s),              # all scalar
+        (pitch_v, tsr_s, yaw_s, tilt_s),              # one vector
+        (pitch_s, tsr_v, yaw_s, tilt_s),
+        (pitch_s, tsr_s, yaw_v, tilt_s),
+        (pitch_s, tsr_s, yaw_s, tilt_v),
+        (pitch_v, tsr_v, yaw_v, tilt_v),              # all vectors
+    ]
+
+    for pitch, tsr, yaw, tilt in cases:
+        sol = bem(pitch, tsr, yaw=yaw, tilt=tilt)
+
+        pitch_a = np.asarray(pitch)
+        tsr_a   = np.asarray(tsr)
+        yaw_a   = np.asarray(yaw)
+        tilt_a  = np.asarray(tilt)
+
+        # Determine expected dimensionality:
+        # If any input is vector → vector length defines output dim
+        vector_inputs = [x for x in [pitch_a, tsr_a, yaw_a, tilt_a] if x.ndim == 1]
+
+        if len(vector_inputs) == 0:
+            expected_ndim = 0
+        else:
+            # all vectors must have same length
+            lengths = [x.shape[0] for x in vector_inputs]
+            assert all(l == lengths[0] for l in lengths), "All vector inputs must have same length"
+            expected_ndim = 1
+
+        Cp = np.asarray(sol.Cp())
+        assert Cp.ndim == expected_ndim or (expected_ndim == 0 and Cp.ndim == 0)
+        # Ensure consistency across solution fields
+        u4 = np.asarray(sol.u4)
+        assert u4.shape == Cp.shape
+
+test_BEM_dimensionality()

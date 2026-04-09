@@ -7,7 +7,7 @@ from UnifiedMomentumModel.Utilities.FixedPointIteration import FixedPointIterati
 
 from . import Momentum, TipLoss
 from .Aerodynamics import AerodynamicModel, AerodynamicProperties, DefaultAerodynamics
-from .Geometry import BEMGeometry, expand_geometry, expand_to_Nr_Ntheta
+from .Geometry import BEMGeometry, expand_to_Np, expand_to_Nr_Ntheta
 from .RotorDefinition import RotorDefinition
 from .TangentialInduction import DefaultTangentialInduction, TangentialInductionModel
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
@@ -170,8 +170,10 @@ class BEM:
         return X, Y, Z
     
     def pre_process(self, pitch, tsr, yaw = 0, tilt = 0, **kwargs):
-        # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
+        pitch, tsr = np.asarray(pitch), np.asarray(tsr)
         yaw, tilt = np.asarray(yaw), np.asarray(tilt)
+        self.scalar_inputs = (pitch.ndim == 0) & (tsr.ndim == 0) & (yaw.ndim == 0) & (tilt.ndim == 0)
+        # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
         yaw, tilt = np.broadcast_arrays(yaw, tilt)
         eff_yaw = calc_eff_yaw(yaw, tilt)
         # initialize dtheta
@@ -190,8 +192,8 @@ class BEM:
         # expand everything to the correct dimensions to ensure broadcasting
         self.aerodynamic_model.eff_yaw = expand_to_Nr_Ntheta(eff_yaw)
         self.aerodynamic_model.delta_theta = expand_to_Nr_Ntheta(dtheta)
-        self.geometry.mu_mesh = expand_geometry(self.geometry.mu_mesh)
-        self.geometry.theta_mesh = expand_geometry(self.geometry.theta_mesh)
+        self.geometry.mu_mesh = expand_to_Np(self.geometry.mu_mesh)
+        self.geometry.theta_mesh = expand_to_Np(self.geometry.theta_mesh)
         return
 
     def initial_guess(self, *args, **kwargs) -> Tuple[ArrayLike, ...]:
@@ -241,5 +243,18 @@ class BEM:
         aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt)
         avg_Ct = average(self.geometry, aero_props.C_x)
         u4,v4,w4 = self.momentum_model.compute_initial_wake_velocities(avg_Ct, yaw, tilt = tilt)
+
+        if self.scalar_inputs: # if all setpoints were scalars
+            # return single values as scalars
+            pitch, tsr, yaw, tilt = [np.asarray(x).item() for x in (pitch, tsr, yaw, tilt)]
+            u4, v4, w4 = [np.asarray(x).item() for x in (u4, v4, w4)]
+            # remove unneeded extra axis from Ntheta x Nr arrays
+            an = np.squeeze(an)
+            aprime = np.squeeze(aprime)
+            self.geometry.theta_mesh = np.squeeze(self.geometry.theta_mesh)
+            self.geometry.mu_mesh = np.squeeze(self.geometry.mu_mesh)
+            for key, value in vars(aero_props).items():
+                if isinstance(value, np.ndarray):
+                    setattr(aero_props, key, np.squeeze(value))
 
         return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4, tilt = tilt, w4 = w4)

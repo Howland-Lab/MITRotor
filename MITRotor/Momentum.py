@@ -69,8 +69,6 @@ class MomentumModel(ABC):
         an = self.compute_induction(rotor_avg_axial_force, yaw = yaw, tilt = tilt)
         return expand_to_Nr_Ntheta(an)
 
-
-
     def _func_annulus(
         self,
         aero_props: "AerodynamicProperties",
