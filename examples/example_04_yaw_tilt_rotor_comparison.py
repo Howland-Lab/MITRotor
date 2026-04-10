@@ -41,7 +41,7 @@ for idx in range(0, Nr):
     axes[i, j].set_title(f"r/R ={np.round(r_mesh[0], decimals=2)}")
 
 fig.legend(
-    [f"Yaw ${rounded_deg_misalignment}^\circ$", f"Tilt ${rounded_deg_misalignment}^\circ$", f"Yaw ${np.rad2deg(yaw)}^\circ$ and Tilt ${np.rad2deg(yaw)}^\circ$"],  # labels
+    [f"Yaw ${rounded_deg_misalignment}^\\circ$", f"Tilt ${rounded_deg_misalignment}^\\circ$", f"Yaw ${np.rad2deg(yaw)}^\\circ$ and Tilt ${np.rad2deg(yaw)}^\\circ$"],  # labels
     loc='lower center',
     ncol=3,
     bbox_to_anchor=(0.5, 0.05)

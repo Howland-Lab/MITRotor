@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from .RotorDefinition import RotorDefinition
-from .Geometry import BEMGeometry
+from .Geometry import BEMGeometry, expand_to_Nr_Ntheta
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 __all__ = [
@@ -269,13 +269,16 @@ class DefaultAerodynamics(AerodynamicModel):
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
         """
+        tsr = expand_to_Nr_Ntheta(tsr)
+        pitch = expand_to_Nr_Ntheta(pitch)
         # calculate values in "yaw-only" frame
         local_yaw = -self.eff_yaw
         Vax = U * ((1 - an) * np.cos(local_yaw))
+        theta_eff = geom.theta_mesh + self.delta_theta
         Vtan = (
             (1 + aprime) * tsr * geom.mu_mesh
             - U * (1 - an)
-            * np.cos(self.eff_theta_mesh)
+            * np.cos(theta_eff)
             * np.sin(local_yaw)
         )
 
@@ -291,8 +294,8 @@ class DefaultAerodynamics(AerodynamicModel):
             an = an,
             aprime = aprime,
             solidity = solidity,
-            U = U * np.ones(geom.shape),
-            wdir = wdir * np.ones(geom.shape),
+            U = U * np.ones_like(geom.mu_mesh),
+            wdir = wdir * np.ones_like(geom.mu_mesh),
             Vax = Vax,
             Vtan = Vtan,
             aoa = aoa,

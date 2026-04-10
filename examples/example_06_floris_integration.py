@@ -110,10 +110,10 @@ mit_rotor_umm_start = time.time()
 pitches = np.deg2rad(pitch_interp(wind_speeds))
 tsrs = tsr_interp(wind_speeds)
 yaws, tilts = np.zeros_like(pitches), np.zeros_like(pitches)
-mit_sols_rotor_umm = [bem_rotor_umm(pitch=pitches[i], tsr=tsrs[i], yaw=yaws[i], tilt=tilts[i]) for i in range(len(pitches))]
+mit_sols_rotor_umm = bem_rotor_umm(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
 mit_rotor_umm_end = time.time()
-mit_Ct_rotor_umm = [sol.Ct() for sol in mit_sols_rotor_umm]
-mit_Cp_rotor_umm = [sol.Cp() for sol in mit_sols_rotor_umm]
+mit_Ct_rotor_umm = mit_sols_rotor_umm.Ct()
+mit_Cp_rotor_umm = mit_sols_rotor_umm.Cp()
 print("MITRotor UMM-BEM Rotor-Averaged: " + str(mit_rotor_umm_end - mit_rotor_umm_start) + " seconds")
 
 # solve UMM-BEM though MITRotor - annulus averaged
@@ -124,10 +124,10 @@ bem_annulus_umm = BEM(
         tiploss_model=NoTipLoss(),
     )
 mit_annulus_umm_start = time.time()
-mit_sols_annulus_umm = [bem_annulus_umm(pitch=pitches[i], tsr=tsrs[i], yaw=yaws[i], tilt=tilts[i]) for i in range(len(pitches))]
+mit_sols_annulus_umm = bem_annulus_umm(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
 mit_annulus_umm_end = time.time()
-mit_Ct_annulus_umm = [sol.Ct() for sol in mit_sols_annulus_umm]
-mit_Cp_annulus_umm = [sol.Cp() for sol in mit_sols_annulus_umm]
+mit_Ct_annulus_umm = mit_sols_annulus_umm.Ct()
+mit_Cp_annulus_umm = mit_sols_annulus_umm.Cp()
 print("MITRotor UMM-BEM Annulus-Averaged: " + str(mit_annulus_umm_end - mit_annulus_umm_start) + " seconds")
 
 # solve UMM-BEM though MITRotor - sector averaged
@@ -153,10 +153,10 @@ bem_annulus_umm_LUT = BEM(
     tiploss_model=NoTipLoss(),
 )
 mit_annulus_umm_LUT_start = time.time()
-mit_sols_annulus_umm_LUT = [bem_annulus_umm_LUT(pitch=pitches[i], tsr=tsrs[i], yaw=yaws[i], tilt=tilts[i]) for i in range(len(pitches))]
+mit_sols_annulus_umm_LUT = bem_annulus_umm_LUT(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
 mit_annulus_umm_LUT_end = time.time()
-mit_Ct_annulus_umm_LUT = [sol.Ct() for sol in mit_sols_annulus_umm_LUT]
-mit_Cp_annulus_umm_LUT = [sol.Cp() for sol in mit_sols_annulus_umm_LUT]
+mit_Ct_annulus_umm_LUT = mit_sols_annulus_umm_LUT.Ct()
+mit_Cp_annulus_umm_LUT = mit_sols_annulus_umm_LUT.Cp()
 print("MITRotor UMM-BEM LUT Annulus-Averaged: " + str(mit_annulus_umm_LUT_end - mit_annulus_umm_LUT_start) + " seconds")
 
 # solve FLORIS  with UMM-BEM though MITRotor - rotor averaged
