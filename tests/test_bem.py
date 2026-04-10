@@ -103,69 +103,6 @@ def test_model_yaw_tilt_rotor_phase():
         # yaw and evenly split yaw/tilt should be offset by 45 degrees
         assert np.isclose(np.abs(theta_mesh[yaw_max_idx] - theta_mesh[yaw_and_tilt_max_idx]), np.pi / 4, atol = deg_atol)
 
-# def test_BEM_dimensionality():
-#     Nr, Ntheta = 20, 40
-#     rotor = IEA15MW()
-
-#     bem_rotor = BEM(rotor=rotor, momentum_model=UnifiedMomentum(averaging="rotor"), geometry = BEMGeometry(Nr=Nr, Ntheta=Ntheta))
-#     bem_annulus = BEM(rotor=rotor, momentum_model=UnifiedMomentumLUT(averaging="annulus"), geometry = BEMGeometry(Nr=Nr, Ntheta=Ntheta))
-#     bem_sector = BEM(rotor=rotor, momentum_model=UnifiedMomentumLUT(averaging="sector"), geometry = BEMGeometry(Nr=Nr, Ntheta=Ntheta))
-#     # Scalars
-#     pitch_s = 0.0
-#     tsr_s   = 7.0
-#     yaw_s   = 0.0
-#     tilt_s  = 0.0
-
-#     # Vectors (same length)
-#     pitch_v = np.array([0.0, 0.1, 0.2])
-#     tsr_v   = np.array([6.0, 7.0, 8.0])
-#     yaw_v   = np.array([0.0, 0.1, 0.2])
-#     tilt_v  = np.array([0.0, -0.1, -0.2])
-
-#     # Mixed scalar + vector cases
-#     cases = [
-#         (pitch_s, tsr_s, yaw_s, tilt_s),              # all scalar
-#         (pitch_v, tsr_v, yaw_v, tilt_v),              # all vectors
-#     ]
-
-#     for (i, (pitch, tsr, yaw, tilt)) in enumerate(cases):
-#         if i == 0: # scalar inputs
-#             Np = 0
-#         else: # vector inputs
-#             Np = len(np.asarray(pitch))
-#         for (j, bem) in enumerate([bem_rotor, bem_annulus, bem_sector]):
-#             if j == 0:
-#                 expected_rotor_shape = () if Np == 0 else (Np,)
-#             elif j == 1:
-#                 expected_rotor_shape = (Nr,) if Np == 0 else (Np, Nr)
-#             else:
-#                 expected_rotor_shape = (Nr, Ntheta) if Np == 0 else (Np, Nr, Ntheta)
-
-#             sol = bem(pitch, tsr, yaw=yaw, tilt=tilt)
-#             u4, w4 = np.asarray(sol.u4), np.asarray(sol.w4)
-#             assert u4.shape == expected_rotor_shape
-#             assert w4.shape == expected_rotor_shape
-
-#             for (k, grid) in enumerate(["rotor", "annulus", "sector"]):
-#                 if k == 0:
-#                     expected_avg_shape = () if Np == 0 else (Np,)
-#                 elif k == 1:
-#                     expected_avg_shape = (Nr,) if Np == 0 else (Np, Nr)
-#                 else:
-#                     expected_avg_shape = (Nr, Ntheta) if Np == 0 else (Np, Nr, Ntheta)
-
-#                 Cp, Cp_corr = np.asarray(sol.Cp(grid = grid)), np.asarray(sol.Cp_corr(grid = grid))
-#                 Ct, a = np.asarray(sol.Ct(grid = grid)), np.asarray(sol.a(grid = grid))
-#                 aoa = np.asarray(sol.aoa(grid = grid))
-
-#                 assert Cp.shape == expected_avg_shape
-#                 assert Cp_corr.shape == Cp.shape
-#                 assert Ct.shape  == Cp.shape
-#                 assert a.shape == Cp.shape
-#                 assert aoa.shape  == Cp.shape
-
-# test_BEM_dimensionality()
-
 def _expected_shape(grid, Np, Nr, Ntheta):
     if grid == "rotor":
         return () if Np == 0 else (Np,)
