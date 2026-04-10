@@ -98,7 +98,7 @@ class MomentumModel(ABC):
         tilt: float = 0.0,
     ) -> ArrayLike:
         axial_force = np.clip(aero_props.C_x_corr, -10, 10)
-
+        yaw, tilt = expand_to_Nr_Ntheta(yaw), expand_to_Nr_Ntheta(tilt)
         return self.compute_induction(axial_force, yaw = yaw, tilt = tilt)
 
     def __call__(

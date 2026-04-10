@@ -59,13 +59,13 @@ class BEMSolution:
     def U(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.U, grid)
 
-    def wdir(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def wdir(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.wdir, grid)
 
     def Vax(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.Vax, grid)
 
-    def Vtan(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def Vtan(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.Vtan, grid)
 
     def W(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -92,29 +92,27 @@ class BEMSolution:
     def Cx(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_x_corr, grid)
 
-    def Ctau(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def Ctau(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_tau_corr, grid)
     
-    def Ctau_uncorr(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def Ctau_uncorr(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_tau, grid)
 
     def F(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.F, grid)
     
     def Cp(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        dCp = (
-            expand_to_Nr_Ntheta(self.tsr)
-            * self.geom.mu_mesh
-            * self.Ctau_uncorr(grid="sector")
-        )
+        tsr = np.asarray(self.tsr)
+        if tsr.ndim == 1:
+            tsr = expand_to_Nr_Ntheta(tsr)
+        dCp = (tsr * self.geom.mu_mesh * self.Ctau_uncorr(grid="sector"))
         return average(self.geom, dCp, grid=grid)
     
     def Cp_corr(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        dCp = (
-            expand_to_Nr_Ntheta(self.tsr)
-            * self.geom.mu_mesh
-            * self.Ctau(grid="sector")
-        )
+        tsr = np.asarray(self.tsr)
+        if tsr.ndim == 1:
+            tsr = expand_to_Nr_Ntheta(tsr)
+        dCp = (tsr * self.geom.mu_mesh * self.Ctau(grid="sector"))
         return average(self.geom, dCp, grid=grid)
     
     def Ct(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -173,6 +171,8 @@ class BEM:
         pitch, tsr = np.asarray(pitch), np.asarray(tsr)
         yaw, tilt = np.asarray(yaw), np.asarray(tilt)
         self.scalar_inputs = (pitch.ndim == 0) & (tsr.ndim == 0) & (yaw.ndim == 0) & (tilt.ndim == 0)
+        if not self.scalar_inputs:
+            assert len(pitch) == len(tsr) == len(yaw) == len(tilt), "Setpoint arrays should be the same lenght"
         # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
         yaw, tilt = np.broadcast_arrays(yaw, tilt)
         eff_yaw = calc_eff_yaw(yaw, tilt)

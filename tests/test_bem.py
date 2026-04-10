@@ -1,4 +1,4 @@
-from MITRotor import BEM, IEA15MW, UnifiedMomentum, BEMGeometry
+from MITRotor import BEM, IEA15MW, UnifiedMomentum, UnifiedMomentumLUT, BEMGeometry
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 import numpy as np
 from pytest import approx
@@ -103,57 +103,133 @@ def test_model_yaw_tilt_rotor_phase():
         # yaw and evenly split yaw/tilt should be offset by 45 degrees
         assert np.isclose(np.abs(theta_mesh[yaw_max_idx] - theta_mesh[yaw_and_tilt_max_idx]), np.pi / 4, atol = deg_atol)
 
+# def test_BEM_dimensionality():
+#     Nr, Ntheta = 20, 40
+#     rotor = IEA15MW()
+
+#     bem_rotor = BEM(rotor=rotor, momentum_model=UnifiedMomentum(averaging="rotor"), geometry = BEMGeometry(Nr=Nr, Ntheta=Ntheta))
+#     bem_annulus = BEM(rotor=rotor, momentum_model=UnifiedMomentumLUT(averaging="annulus"), geometry = BEMGeometry(Nr=Nr, Ntheta=Ntheta))
+#     bem_sector = BEM(rotor=rotor, momentum_model=UnifiedMomentumLUT(averaging="sector"), geometry = BEMGeometry(Nr=Nr, Ntheta=Ntheta))
+#     # Scalars
+#     pitch_s = 0.0
+#     tsr_s   = 7.0
+#     yaw_s   = 0.0
+#     tilt_s  = 0.0
+
+#     # Vectors (same length)
+#     pitch_v = np.array([0.0, 0.1, 0.2])
+#     tsr_v   = np.array([6.0, 7.0, 8.0])
+#     yaw_v   = np.array([0.0, 0.1, 0.2])
+#     tilt_v  = np.array([0.0, -0.1, -0.2])
+
+#     # Mixed scalar + vector cases
+#     cases = [
+#         (pitch_s, tsr_s, yaw_s, tilt_s),              # all scalar
+#         (pitch_v, tsr_v, yaw_v, tilt_v),              # all vectors
+#     ]
+
+#     for (i, (pitch, tsr, yaw, tilt)) in enumerate(cases):
+#         if i == 0: # scalar inputs
+#             Np = 0
+#         else: # vector inputs
+#             Np = len(np.asarray(pitch))
+#         for (j, bem) in enumerate([bem_rotor, bem_annulus, bem_sector]):
+#             if j == 0:
+#                 expected_rotor_shape = () if Np == 0 else (Np,)
+#             elif j == 1:
+#                 expected_rotor_shape = (Nr,) if Np == 0 else (Np, Nr)
+#             else:
+#                 expected_rotor_shape = (Nr, Ntheta) if Np == 0 else (Np, Nr, Ntheta)
+
+#             sol = bem(pitch, tsr, yaw=yaw, tilt=tilt)
+#             u4, w4 = np.asarray(sol.u4), np.asarray(sol.w4)
+#             assert u4.shape == expected_rotor_shape
+#             assert w4.shape == expected_rotor_shape
+
+#             for (k, grid) in enumerate(["rotor", "annulus", "sector"]):
+#                 if k == 0:
+#                     expected_avg_shape = () if Np == 0 else (Np,)
+#                 elif k == 1:
+#                     expected_avg_shape = (Nr,) if Np == 0 else (Np, Nr)
+#                 else:
+#                     expected_avg_shape = (Nr, Ntheta) if Np == 0 else (Np, Nr, Ntheta)
+
+#                 Cp, Cp_corr = np.asarray(sol.Cp(grid = grid)), np.asarray(sol.Cp_corr(grid = grid))
+#                 Ct, a = np.asarray(sol.Ct(grid = grid)), np.asarray(sol.a(grid = grid))
+#                 aoa = np.asarray(sol.aoa(grid = grid))
+
+#                 assert Cp.shape == expected_avg_shape
+#                 assert Cp_corr.shape == Cp.shape
+#                 assert Ct.shape  == Cp.shape
+#                 assert a.shape == Cp.shape
+#                 assert aoa.shape  == Cp.shape
+
+# test_BEM_dimensionality()
+
+def _expected_shape(grid, Np, Nr, Ntheta):
+    if grid == "rotor":
+        return () if Np == 0 else (Np,)
+    elif grid == "annulus":
+        return (Nr,) if Np == 0 else (Np, Nr)
+    elif grid == "sector":
+        return (Nr, Ntheta) if Np == 0 else (Np, Nr, Ntheta)
+    else:
+        raise ValueError(grid)
+
+
 def test_BEM_dimensionality():
-
+    Nr, Ntheta = 20, 40
     rotor = IEA15MW()
-    bem = BEM(rotor=rotor)
 
-    # Scalars
-    pitch_s = 0.0
-    tsr_s   = 7.0
-    yaw_s   = 0.0
-    tilt_s  = 0.0
+    bems = [
+        BEM(rotor=rotor,
+            momentum_model=UnifiedMomentum(averaging="rotor"),
+            geometry=BEMGeometry(Nr=Nr, Ntheta=Ntheta)),
 
-    # Vectors (same length)
+        BEM(rotor=rotor,
+            momentum_model=UnifiedMomentumLUT(averaging="annulus"),
+            geometry=BEMGeometry(Nr=Nr, Ntheta=Ntheta)),
+
+        BEM(rotor=rotor,
+            momentum_model=UnifiedMomentumLUT(averaging="sector"),
+            geometry=BEMGeometry(Nr=Nr, Ntheta=Ntheta)),
+    ]
+
+    # --- inputs ---
+    pitch_s, tsr_s, yaw_s, tilt_s = 0.0, 7.0, 0.0, 0.0
+
     pitch_v = np.array([0.0, 0.1, 0.2])
     tsr_v   = np.array([6.0, 7.0, 8.0])
     yaw_v   = np.array([0.0, 0.1, 0.2])
     tilt_v  = np.array([0.0, -0.1, -0.2])
 
-    # Mixed scalar + vector cases
     cases = [
-        (pitch_s, tsr_s, yaw_s, tilt_s),              # all scalar
-        (pitch_v, tsr_s, yaw_s, tilt_s),              # one vector
-        (pitch_s, tsr_v, yaw_s, tilt_s),
-        (pitch_s, tsr_s, yaw_v, tilt_s),
-        (pitch_s, tsr_s, yaw_s, tilt_v),
-        (pitch_v, tsr_v, yaw_v, tilt_v),              # all vectors
+        (pitch_s, tsr_s, yaw_s, tilt_s, 0),
+        (pitch_v, tsr_v, yaw_v, tilt_v, 3),
     ]
 
-    for pitch, tsr, yaw, tilt in cases:
-        sol = bem(pitch, tsr, yaw=yaw, tilt=tilt)
+    fields = ["Cp", "Cp_corr", "Ct", "a", "aoa"]
 
-        pitch_a = np.asarray(pitch)
-        tsr_a   = np.asarray(tsr)
-        yaw_a   = np.asarray(yaw)
-        tilt_a  = np.asarray(tilt)
+    for pitch, tsr, yaw, tilt, Np in cases:
+        for bem in bems:
+            sol = bem(pitch, tsr, yaw=yaw, tilt=tilt)
 
-        # Determine expected dimensionality:
-        # If any input is vector → vector length defines output dim
-        vector_inputs = [x for x in [pitch_a, tsr_a, yaw_a, tilt_a] if x.ndim == 1]
+            # =========================
+            # 1. u4, w4 dimensionality
+            # =========================
+            u4 = np.asarray(sol.u4)
+            w4 = np.asarray(sol.w4)
 
-        if len(vector_inputs) == 0:
-            expected_ndim = 0
-        else:
-            # all vectors must have same length
-            lengths = [x.shape[0] for x in vector_inputs]
-            assert all(l == lengths[0] for l in lengths), "All vector inputs must have same length"
-            expected_ndim = 1
+            expected = () if Np == 0 else (Np,)
+            assert u4.shape == expected
+            assert w4.shape == expected
 
-        Cp = np.asarray(sol.Cp())
-        assert Cp.ndim == expected_ndim or (expected_ndim == 0 and Cp.ndim == 0)
-        # Ensure consistency across solution fields
-        u4 = np.asarray(sol.u4)
-        assert u4.shape == Cp.shape
+            # =========================
+            # 2. Shape checks for fields
+            # =========================
+            for grid in ["rotor", "annulus", "sector"]:
+                expected_shape = _expected_shape(grid, Np, Nr, Ntheta)
 
-test_BEM_dimensionality()
+                for name in fields:
+                    val = np.asarray(getattr(sol, name)(grid=grid))
+                    assert val.shape == expected_shape, f"{name}, {grid}"
