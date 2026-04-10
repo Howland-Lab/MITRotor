@@ -7,10 +7,11 @@ from UnifiedMomentumModel.Utilities.FixedPointIteration import FixedPointIterati
 
 from . import Momentum, TipLoss
 from .Aerodynamics import AerodynamicModel, AerodynamicProperties, DefaultAerodynamics
-from .Geometry import BEMGeometry
+from .Geometry import BEMGeometry, expand_to_Np, expand_to_Nr_Ntheta
 from .RotorDefinition import RotorDefinition
 from .TangentialInduction import DefaultTangentialInduction, TangentialInductionModel
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
+
 
 
 def average(geometry: BEMGeometry, value: ArrayLike, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -58,13 +59,13 @@ class BEMSolution:
     def U(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.U, grid)
 
-    def wdir(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def wdir(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.wdir, grid)
 
     def Vax(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.Vax, grid)
 
-    def Vtan(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def Vtan(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.Vtan, grid)
 
     def W(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -91,29 +92,27 @@ class BEMSolution:
     def Cx(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_x_corr, grid)
 
-    def Ctau(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def Ctau(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_tau_corr, grid)
     
-    def Ctau_uncorr(self, grid: Literal["sector ", "annulus", "rotor"] = "rotor"):
+    def Ctau_uncorr(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.C_tau, grid)
 
     def F(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.F, grid)
     
     def Cp(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        dCp = (
-            self.tsr
-            * self.geom.mu_mesh
-            * self.Ctau_uncorr(grid="sector")
-        )
+        tsr = np.asarray(self.tsr)
+        if tsr.ndim == 1:
+            tsr = expand_to_Nr_Ntheta(tsr)
+        dCp = (tsr * self.geom.mu_mesh * self.Ctau_uncorr(grid="sector"))
         return average(self.geom, dCp, grid=grid)
     
     def Cp_corr(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        dCp = (
-            self.tsr
-            * self.geom.mu_mesh
-            * self.Ctau(grid="sector")
-        )
+        tsr = np.asarray(self.tsr)
+        if tsr.ndim == 1:
+            tsr = expand_to_Nr_Ntheta(tsr)
+        dCp = (tsr * self.geom.mu_mesh * self.Ctau(grid="sector"))
         return average(self.geom, dCp, grid=grid)
     
     def Ct(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
@@ -169,21 +168,37 @@ class BEM:
         return X, Y, Z
     
     def pre_process(self, pitch, tsr, yaw = 0, tilt = 0, **kwargs):
+        pitch, tsr = np.asarray(pitch), np.asarray(tsr)
+        yaw, tilt = np.asarray(yaw), np.asarray(tilt)
+        self.scalar_inputs = (pitch.ndim == 0) & (tsr.ndim == 0) & (yaw.ndim == 0) & (tilt.ndim == 0)
+        if not self.scalar_inputs:
+            assert len(pitch) == len(tsr) == len(yaw) == len(tilt), "Setpoint arrays should be the same lenght"
         # switch reference frame to a "yaw-only" frame where y' is aligned with the lateral wake
-        self.aerodynamic_model.eff_yaw = calc_eff_yaw(yaw, tilt)
-        if tilt == 0:
-            dtheta = 0
-        elif yaw == 0:
-            dtheta = np.pi / 2
-        else: # non-zero yaw and tilt
-            sin_eff = np.sin(self.aerodynamic_model.eff_yaw)
-            dtheta = np.arccos(np.sin(yaw) / sin_eff)
-        self.aerodynamic_model.eff_theta_mesh = self.geometry.theta_mesh + dtheta
+        yaw, tilt = np.broadcast_arrays(yaw, tilt)
+        eff_yaw = calc_eff_yaw(yaw, tilt)
+        # initialize dtheta
+        dtheta = np.zeros_like(eff_yaw, dtype=float)
+        # masks
+        yaw_zero = (yaw == 0)
+        not_tilt_zero = np.logical_not(tilt == 0)
+        # case1: yaw == 0 and tilt != 0
+        case1 = yaw_zero & not_tilt_zero
+        dtheta[case1] = np.pi / 2
+        # case2: yaw != 0 and tilt != 0
+        case2 = np.logical_not(yaw_zero) & not_tilt_zero
+        dtheta[case2] = np.arccos(
+            np.sin(yaw[case2]) / np.sin(eff_yaw[case2])
+        )
+        # expand everything to the correct dimensions to ensure broadcasting
+        self.aerodynamic_model.eff_yaw = expand_to_Nr_Ntheta(eff_yaw)
+        self.aerodynamic_model.delta_theta = expand_to_Nr_Ntheta(dtheta)
+        self.geometry.mu_mesh = expand_to_Np(self.geometry.mu_mesh)
+        self.geometry.theta_mesh = expand_to_Np(self.geometry.theta_mesh)
         return
 
     def initial_guess(self, *args, **kwargs) -> Tuple[ArrayLike, ...]:
-        a = (1 / 3) * np.ones(self.geometry.shape)
-        aprime = np.zeros(self.geometry.shape)
+        a = (1 / 3) * np.ones_like(self.geometry.mu_mesh)
+        aprime = np.zeros_like(self.geometry.mu_mesh)
 
         return a, aprime
 
@@ -198,8 +213,8 @@ class BEM:
         tilt: ArrayLike = 0.0,
     ) -> Tuple[ArrayLike, ...]:
         an, aprime = x
-        U = np.ones(self.geometry.shape) if U is None else U
-        wdir = np.zeros(self.geometry.shape) if wdir is None else wdir
+        U = np.ones_like(self.geometry.mu_mesh) if U is None else U
+        wdir = np.zeros_like(self.geometry.mu_mesh) if wdir is None else wdir
 
         aero_props = self.aerodynamic_model(
             an = an, 
@@ -221,12 +236,25 @@ class BEM:
         return e_an, e_aprime
 
     def post_process(self, result: FixedPointIterationResult, pitch, tsr, yaw = 0, U=None, wdir=None, tilt = 0.0) -> BEMSolution:
-        U = np.ones(self.geometry.shape) if U is None else U
-        wdir = np.zeros(self.geometry.shape) if wdir is None else wdir
+        U = np.ones_like(self.geometry.mu_mesh) if U is None else U
+        wdir = np.zeros_like(self.geometry.mu_mesh) if wdir is None else wdir
         an, aprime = result.x
         aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir, tilt = tilt)
         aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt)
         avg_Ct = average(self.geometry, aero_props.C_x)
         u4,v4,w4 = self.momentum_model.compute_initial_wake_velocities(avg_Ct, yaw, tilt = tilt)
+
+        if self.scalar_inputs: # if all setpoints were scalars
+            # return single values as scalars
+            pitch, tsr, yaw, tilt = [np.asarray(x).item() for x in (pitch, tsr, yaw, tilt)]
+            u4, v4, w4 = [np.asarray(x).item() for x in (u4, v4, w4)]
+            # remove unneeded extra axis from Ntheta x Nr arrays
+            an = np.squeeze(an)
+            aprime = np.squeeze(aprime)
+            self.geometry.theta_mesh = np.squeeze(self.geometry.theta_mesh)
+            self.geometry.mu_mesh = np.squeeze(self.geometry.mu_mesh)
+            for key, value in vars(aero_props).items():
+                if isinstance(value, np.ndarray):
+                    setattr(aero_props, key, np.squeeze(value))
 
         return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4, tilt = tilt, w4 = w4)

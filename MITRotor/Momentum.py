@@ -8,6 +8,7 @@ from MITRotor.CachedLUT import CachedLUT
 from pathlib import Path
 from UnifiedMomentumModel import Momentum as UMM
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw, eff_yaw_inv_rotation
+from .Geometry import expand_to_Nr_Ntheta, expand_to_Nr, expand_to_Ntheta
 
 if TYPE_CHECKING:
     from .Geometry import BEMGeometry
@@ -62,13 +63,11 @@ class MomentumModel(ABC):
             geom.rotor_average(
                 geom.annulus_average(
                     np.clip(aero_props.C_x_corr, 0, 1.69)
-                    )
-                    )
+                )
+            )
         )
-
-        return self.compute_induction(rotor_avg_axial_force, yaw = yaw, tilt = tilt)
-
-
+        an = self.compute_induction(rotor_avg_axial_force, yaw = yaw, tilt = tilt)
+        return expand_to_Nr_Ntheta(an)
 
     def _func_annulus(
         self,
@@ -81,15 +80,12 @@ class MomentumModel(ABC):
         tilt: float = 0.0,
     ) -> ArrayLike:
         
-        annulus_avg_axial_force = (
-            
-                geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, -10, 10)
-                    )
-                    )[:, None] * np.ones(geom.shape)
-        
-
-        return self.compute_induction(annulus_avg_axial_force, yaw = yaw, tilt = tilt)
+        annulus_avg_axial_force = geom.annulus_average(
+            np.clip(aero_props.C_x_corr, 0, 1.69)
+        )
+        yaw, tilt = expand_to_Nr(yaw), expand_to_Nr(tilt)
+        an = self.compute_induction(annulus_avg_axial_force, yaw = yaw, tilt = tilt)
+        return expand_to_Ntheta(an)
 
     def _func_sector(
         self,
@@ -102,7 +98,7 @@ class MomentumModel(ABC):
         tilt: float = 0.0,
     ) -> ArrayLike:
         axial_force = np.clip(aero_props.C_x_corr, -10, 10)
-
+        yaw, tilt = expand_to_Nr_Ntheta(yaw), expand_to_Nr_Ntheta(tilt)
         return self.compute_induction(axial_force, yaw = yaw, tilt = tilt)
 
     def __call__(
@@ -188,8 +184,8 @@ class MadsenMomentum(MomentumModel):
 
 
     def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
-            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+        # if tilt != 0:
+            # raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         if self.cosine_exponent:
             Ct = Cx / (np.cos(yaw)**2)
         else:
