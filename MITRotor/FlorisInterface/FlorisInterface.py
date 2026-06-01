@@ -53,8 +53,10 @@ class MITRotorTurbine(BaseOperationModel):
 
     Args:
         bem_model (BEM): optional BEM model as defined in MITRotor, defaults to IEA15MW with UMM momentum model
-        pitch_csv (str): optional path to pitch trajectory based on wind speed, defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
-        tsr_csv (str)): optional path to tsr trajectory based on wind speed, defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
+        pitch_interp (interp1d): optional 1D interpolator for pitch trajectory based on wind speed,
+            defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
+        tsr_interp (interp1d): optional  1D interpolator for tsr trajectory based on wind speed,
+            defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
 
     Methods:
         power
@@ -109,7 +111,7 @@ class MITRotorTurbine(BaseOperationModel):
             # calculate rotor area
             rotor_area = np.pi * self.bem_model.rotor.R**2 
 
-                        # get setpoints
+            # get setpoints
             yaw, tilt = np.deg2rad(yaw_angles), np.deg2rad(tilt_angles)
             pitch = np.deg2rad(self.pitch_interp(rotor_average_velocities))
             tsr = self.tsr_interp(rotor_average_velocities)

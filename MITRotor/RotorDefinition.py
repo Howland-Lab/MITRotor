@@ -105,6 +105,13 @@ class RotorDefinition:
 
         airfoil_func = BladeAirfoils.from_windio(windio, hub_radius, R)
 
+        # Needed for ROSCO Control
+        tower_height = np.max(windio["components"]["tower"]["outer_shape_bem"]["reference_axis"]["z"]["values"])
+        gearbox_efficiency = windio["components"]["nacelle"]["drivetrain"]["gearbox_efficiency"] * 100
+        gearbox_ratio = windio["components"]["nacelle"]["drivetrain"]["gear_ratio"]
+        air_density = windio["environment"]["air_density"]
+        rosco_values = (tower_height, gearbox_efficiency, gearbox_ratio, air_density)
+
         return cls(
             twist_func,
             solidity_func,
@@ -117,6 +124,7 @@ class RotorDefinition:
             tsr_target,
             hub_radius,
             name=name,
+            rosco_values = rosco_values
         )
 
     def __init__(
@@ -132,6 +140,7 @@ class RotorDefinition:
         tsr_target,
         hub_radius,
         name=None,
+        rosco_values = None,
     ):
         self.name = name
         self.N_blades = N_blades
@@ -146,6 +155,8 @@ class RotorDefinition:
         self.twist_func = twist_func
         self.solidity_func = solidity_func
         self.airfoil_func = airfoil_func
+
+        self.rosco_values = rosco_values
 
     def twist(self, mu):
         return self.twist_func(mu)
