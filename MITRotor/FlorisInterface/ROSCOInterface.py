@@ -85,7 +85,10 @@ def load_from_mitrotor(
     turbine.Cq = ROSCO_turbine.RotorPerformance(turbine.Cq_table,turbine.pitch_initial_rad,turbine.TSR_initial, refine=refine_cp_surface)
     return turbine
 
-def get_rosco_control_interps(rosco_yaml, bem, TurbineName = None, generator_inertia = None, GenEff = None):
+def get_rosco_control_interps(
+    rosco_yaml, bem,
+    TurbineName = "IEA15MW", GenEff = 95.756, generator_inertia = 1836784,
+):
     """
     Creates pitch and tsr 1D interpolators using ROSCO controller tuning.
 

@@ -30,7 +30,7 @@ def default_pitch_interp():
     pitch_file = os.path.join(module_dir, "IEA_15mw_rotor.csv")
     df = pl.read_csv(pitch_file)
     wind_table = df["Wind [m/s]"].to_numpy()
-    pitch_table = df["Pitch [deg]"].to_numpy()
+    pitch_table = np.deg2rad(df["Pitch [deg]"])
     # TODO: should fill_value be extrapolate?
     return interp1d(wind_table, pitch_table, kind="linear", fill_value="extrapolate", bounds_error=False)
 
@@ -67,8 +67,9 @@ class MITRotorTurbine(BaseOperationModel):
     bem_model = field(init = True, factory = default_bem_factory, type = BEM)
 
     # create interp objects based on pitch and tsr csvs
-    pitch_interp = field(init=True, factory=default_pitch_interp, type = interp1d, repr = False)
-    tsr_interp = field(init=True, factory=default_tsr_interp, type = interp1d, repr = False)
+    pitch_interp = field(init = True, factory = default_pitch_interp, type = interp1d, repr = False)
+    pitch_rad = field(init = True, default=True, type = bool)
+    tsr_interp = field(init = True, factory = default_tsr_interp, type = interp1d, repr = False)
 
     # save most recent solution by unique floris arguments
     _last_key = field(init=False, default=None, type = bytes)
@@ -113,7 +114,9 @@ class MITRotorTurbine(BaseOperationModel):
 
             # get setpoints
             yaw, tilt = np.deg2rad(yaw_angles), np.deg2rad(tilt_angles)
-            pitch = np.deg2rad(self.pitch_interp(rotor_average_velocities))
+            pitch = self.pitch_interp(rotor_average_velocities)
+            if not self.pitch_rad:
+                pitch = np.deg2rad(pitch)
             tsr = self.tsr_interp(rotor_average_velocities)
             for tindex in range(n_turbines):
                 # solve BEM
