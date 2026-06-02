@@ -73,7 +73,7 @@ pitches = [pitch_interp(u) for u in wind_speeds]
 fig, ax = plt.subplots(figsize=(8, 6))
 ax.scatter(
     wind_speeds,
-    pitches,
+    np.rad2deg(pitches),
     s=40,
     edgecolors="k",
     label = "Interpolated Pitch [deg]"
@@ -104,13 +104,12 @@ plt.savefig(figdir / "example_6_pitch_tsr_interpolation.png", dpi=300)
 
 # -------- plot CT and CP values against one another and against IEA15MW from figure 3.1-C (https://docs.nrel.gov/docs/fy20osti/75698.pdf) -------
 # solve UMM-BEM though MITRotor - rotor averaged
-pitches_rad = np.deg2rad(pitches)
 bem_rotor_umm = default_bem_factory()
 mit_rotor_umm_start = time.time()
-pitches = np.deg2rad(pitch_interp(wind_speeds))
+pitches_rad = pitch_interp(wind_speeds)
 tsrs = tsr_interp(wind_speeds)
-yaws, tilts = np.zeros_like(pitches), np.zeros_like(pitches)
-mit_sols_rotor_umm = bem_rotor_umm(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
+yaws, tilts = np.zeros_like(pitches_rad), np.zeros_like(pitches_rad)
+mit_sols_rotor_umm = bem_rotor_umm(pitch=pitches_rad, tsr=tsrs, yaw=yaws, tilt=tilts)
 mit_rotor_umm_end = time.time()
 mit_Ct_rotor_umm = mit_sols_rotor_umm.Ct()
 mit_Cp_rotor_umm = mit_sols_rotor_umm.Cp()

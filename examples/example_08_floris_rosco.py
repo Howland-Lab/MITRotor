@@ -73,9 +73,9 @@ def main():
     cache_file = cache_dir / "lut.csv"
     lut_model = UnifiedMomentumLUT(
         cache_fn=cache_file,
-        regenerate=False,
+        regenerate=True,
         LUT_Cts=np.linspace(-0.5,1.5,40),
-        LUT_yaws=np.linspace(0.0,20.1,20),
+        LUT_yaws=np.linspace(0.0,25.1,25),
     )
     bem = BEM(rotor = IEA15MW(), momentum_model = lut_model, geometry = BEMGeometry(Nr=10, Ntheta=20))
 
@@ -94,8 +94,8 @@ def main():
     tsr_ps3 = rosco_PS_Mode_3_tsr_interp(wind_speeds)
 
     # Create figure
-    fig, ax = plt.subplots(1, 2, figsize=(10, 4), constrained_layout=True)
-
+    fig, ax = plt.subplots(1, 2, figsize = (10,4), sharey = True, constrained_layout=True)
+    fig.suptitle(fr"Setpoint Trajectories")
     # Plot pitch
     ax[0].plot(wind_speeds, pitch_ps0, label="ROSCO: PS_Mode = 0", lw=3)
     ax[0].plot(wind_speeds, pitch_ps3, label="ROSCO: PS_Mode = 3", lw=3, linestyle = "dashed")
@@ -105,12 +105,12 @@ def main():
     ax[0].set_ylabel("Pitch [deg]")
     ax[0].set_title("Pitch Schedule")
     ax[0].grid(True)
-    ax[0].legend()
+    # ax[0].legend()
 
     # Plot TSR
-    ax[1].plot(wind_speeds, tsr_ps0, label="ROSCO: PS_Mode = 0", lw=3)
-    ax[1].plot(wind_speeds, tsr_ps3, label="ROSCO: PS_Mode = 3", lw=3, linestyle = "dashed")
-    ax[1].plot(wind_speeds, tsr_abbas, label="Abbas et al. Fig 2", lw=3, linestyle = "dotted")
+    ax[1].plot(wind_speeds, tsr_ps0, label="MITRotor+FLORIS+ROSCO: PS_Mode = 0", lw=3)
+    ax[1].plot(wind_speeds, tsr_ps3, label="MITRotor+FLORIS+ROSCO: PS_Mode = 3", lw=3, linestyle = "dashed")
+    ax[1].plot(wind_speeds, tsr_abbas, label="Abbas et al. ROSCO Control", lw=3, linestyle = "dotted")
 
     ax[1].set_xlabel("Wind Speed [m/s]")
     ax[1].set_ylabel("TSR [-]")
@@ -145,84 +145,114 @@ def main():
         pitch_rad = True,
         tsr_interp = rosco_PS_Mode_3_tsr_interp,
     )
-
+    yaw = 0.0 # degrees
+    yaw_angles = [[yaw] for _ in np.arange(len(wind_speeds))]
     fmodel_default = FlorisModel("defaults")
-    fmodel_default.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
+    fmodel_default.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
     fmodel_default.set_operation_model(floris_default_turbine)
     fmodel_default.run()
     Ct_default = fmodel_default.get_turbine_thrust_coefficients()
     Cp_default = get_turbine_power_coefficent(bem, fmodel_default, wind_speeds)
 
     fmodel_abbas = FlorisModel("defaults")
-    fmodel_abbas.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
+    fmodel_abbas.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
     fmodel_abbas.set_operation_model(floris_abbas_turbine)
     fmodel_abbas.run()
     Ct_abbas = fmodel_abbas.get_turbine_thrust_coefficients()
     Cp_abbas = get_turbine_power_coefficent(bem, fmodel_abbas, wind_speeds)
 
     fmodel_PS_Mode_0 = FlorisModel("defaults")
-    fmodel_PS_Mode_0.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
+    fmodel_PS_Mode_0.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
     fmodel_PS_Mode_0.set_operation_model(floris_PS_Mode_0_turbine)
     fmodel_PS_Mode_0.run()
     Ct_PS_Mode_0 = fmodel_PS_Mode_0.get_turbine_thrust_coefficients()
     Cp_PS_Mode_0 = get_turbine_power_coefficent(bem, fmodel_PS_Mode_0, wind_speeds)
 
     fmodel_PS_Mode_3 = FlorisModel("defaults")
-    fmodel_PS_Mode_3.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
+    fmodel_PS_Mode_3.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
     fmodel_PS_Mode_3.set_operation_model(floris_PS_Mode_3_turbine)
     fmodel_PS_Mode_3.run() 
     Ct_PS_Mode_3 = fmodel_PS_Mode_3.get_turbine_thrust_coefficients()
     Cp_PS_Mode_3 = get_turbine_power_coefficent(bem, fmodel_PS_Mode_3, wind_speeds)
 
-    # plot CT values against one another and against IEA15MW from figure 3.1-C (https://docs.nrel.gov/docs/fy20osti/75698.pdf)
-    fig, (ax1, ax2) = plt.subplots(ncols = 2, sharey = True, figsize = (12, 6))
+    # plot CT values against one another and against IEA15MW from figure 3.1-C (https://docs.nlr.gov/docs/fy20osti/75698.pdf)
+    fig, (ax1, ax2) = plt.subplots(ncols = 2, sharey = True, figsize = (10,4), constrained_layout=True)
+    fig.suptitle(fr"$C_T$ and $C_P$ with Yaw = 0 for Different Control Strategies")
     ax1.plot(
-        wind_speeds, Ct_default, label="Default Control",
-        linewidth=2, linestyle = "solid", zorder = 1,
+        wind_speeds, Ct_default, label="FLORIS+MITROTOR + Gaertner et al. Control",
+        lw=3, linestyle = "solid", zorder = 1,
     )
     ax1.plot(
-        wind_speeds, Ct_abbas, label="Abbas et al. Control",
-        linewidth=2, linestyle = "solid", zorder = 1,
+        wind_speeds, Ct_abbas, label="FLORIS+MITROTOR Abbas et al. Control",
+        lw=3, linestyle = "solid", zorder = 1,
     )
     ax1.plot(
-        wind_speeds, Ct_PS_Mode_0, label="ROSCO PS_Mode = 0",
-        linewidth=2, linestyle = "dashed", zorder = 1,
+        wind_speeds, Ct_PS_Mode_0, label="FLORIS+MITROTOR+ROSCO: PS_Mode = 0",
+        lw=3, linestyle = "dashed", zorder = 1,
     )
-    ax1.plot(wind_speeds, Ct_PS_Mode_3, label="ROSCO PS_Mode = 3",
-        linewidth=2, linestyle = "dotted", zorder = 1,
+    ax1.plot(wind_speeds, Ct_PS_Mode_3, label="FLORIS+MITROTOR+ROSCO: PS_Mode = 3",
+        lw=3, linestyle = "dotted", zorder = 1,
     )
     ax1.set_xlabel("Wind Speed [m/s]")
     ax1.set_ylabel("$C_T$")
-    ax1.tick_params()
     ax1.set_title("$C_T$")
     ax1.grid(True)
-    ax1.legend()
+    # ax1.legend()
 
     ax2.plot(
-        wind_speeds, Cp_default, label="Default Control",
-        linewidth=2, linestyle = "solid", zorder = 1,
+        wind_speeds, Cp_default, label="Gaertner et al. IEA15MW Ref",
+        lw=3, linestyle = "solid", zorder = 1,
     )
     ax2.plot(
-        wind_speeds, Cp_abbas, label="Abbas et al. Control",
-        linewidth=2, linestyle = "solid", zorder = 1,
+        wind_speeds, Cp_abbas, label="Abbas et al. ROSCO Control",
+        lw=3, linestyle = "solid", zorder = 1,
     )
     ax2.plot(
-        wind_speeds, Cp_PS_Mode_0, label="ROSCO PS_Mode = 0",
-        linewidth=2, linestyle = "dashed", zorder = 1,
+        wind_speeds, Cp_PS_Mode_0, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 0",
+        lw=3, linestyle = "dashed", zorder = 1,
     )
-    ax2.plot(wind_speeds, Cp_PS_Mode_3, label="ROSCO PS_Mode = 3",
-        linewidth=2, linestyle = "dotted", zorder = 1,
+    ax2.plot(wind_speeds, Cp_PS_Mode_3, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 3",
+        lw=3, linestyle = "dotted", zorder = 1,
     )
     ax2.set_xlabel("Wind Speed [m/s]")
     ax2.set_ylabel("$C_P$")
-    ax2.tick_params()
     ax2.set_title("$C_P$")
     ax2.grid(True)
     ax2.legend()
 
     plt.savefig(figdir / "example_8_IEA15mw_CT_CP.png", dpi=300)
 
+    # plot the difference in CT/CP curves for different yaw values
+    yaw_list = [0.0, 10.0, 20.0] # degrees
+    fig, (ax1, ax2) = plt.subplots(ncols = 2, sharey = True, figsize = (10,4), constrained_layout=True)
+    fig.suptitle(fr"$C_T$ and $C_P$ under Yaw for FLORIS + MITROTOR + ROSCO: PS_Mode = 3")
+    for (i, yaw) in enumerate(yaw_list):
+        yaw_angles = [[yaw] for _ in np.arange(len(wind_speeds))]
+        fmodel_PS_Mode_3 = FlorisModel("defaults")
+        fmodel_PS_Mode_3.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
+        fmodel_PS_Mode_3.set_operation_model(floris_PS_Mode_3_turbine)
+        fmodel_PS_Mode_3.run() 
+        ct = fmodel_PS_Mode_3.get_turbine_thrust_coefficients()
+        cp = get_turbine_power_coefficent(bem, fmodel_PS_Mode_3, wind_speeds)
 
+        ax1.plot(wind_speeds, ct, label=fr"Yaw = ${yaw}^\circ$",
+            lw=3, linestyle = "solid", zorder = 1,
+        )
+        ax2.plot(wind_speeds, cp, label=fr"Yaw = ${yaw}^\circ$",
+            lw=3, linestyle = "solid", zorder = 1,
+        )
+
+    ax1.set_xlabel("Wind Speed [m/s]")
+    ax1.set_ylabel("$C_T$")
+    ax1.set_title("$C_T$")
+    ax1.grid(True)
+
+    ax2.set_xlabel("Wind Speed [m/s]")
+    ax2.set_ylabel("$C_P$")
+    ax2.set_title("$C_P$")
+    ax2.grid(True)
+    ax2.legend()
+    plt.savefig(figdir / "example_8_IEA15mw_CT_CP_yawed.png", dpi=300)
 
 if __name__ == "__main__":
     main()

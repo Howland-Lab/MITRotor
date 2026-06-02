@@ -68,7 +68,7 @@ class MITRotorTurbine(BaseOperationModel):
 
     # create interp objects based on pitch and tsr csvs
     pitch_interp = field(init = True, factory = default_pitch_interp, type = interp1d, repr = False)
-    pitch_rad = field(init = True, default=True, type = bool)
+    pitch_rad = field(init = True, default = True, type = bool)
     tsr_interp = field(init = True, factory = default_tsr_interp, type = interp1d, repr = False)
 
     # save most recent solution by unique floris arguments
@@ -114,10 +114,11 @@ class MITRotorTurbine(BaseOperationModel):
 
             # get setpoints
             yaw, tilt = np.deg2rad(yaw_angles), np.deg2rad(tilt_angles)
-            pitch = self.pitch_interp(rotor_average_velocities)
+            rotor_normal_average_velocities = np.cos(yaw) * np.cos(tilt) * rotor_average_velocities
+            pitch = self.pitch_interp(rotor_normal_average_velocities)
             if not self.pitch_rad:
                 pitch = np.deg2rad(pitch)
-            tsr = self.tsr_interp(rotor_average_velocities)
+            tsr = self.tsr_interp(rotor_normal_average_velocities)
             for tindex in range(n_turbines):
                 # solve BEM
                 bem_sol = self.bem_model(pitch[:, tindex], tsr[:, tindex], yaw = yaw[:, tindex], tilt = tilt[:, tindex])
@@ -125,7 +126,7 @@ class MITRotorTurbine(BaseOperationModel):
                 self._a[:, tindex] = bem_sol.a()
                 self._Ct[:, tindex] = bem_sol.Ct()
                 # compute power
-                self._power[:, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (rotor_average_velocities[:, tindex])**3
+                self._power[:, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (rotor_normal_average_velocities[:, tindex])**3
         return
     
     def power(self, **kwargs) -> NDArrayFloat:
