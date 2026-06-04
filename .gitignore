@@ -17,6 +17,7 @@ fig*
 
 # Allow these CSVs needed for the floris interface
 !MITRotor/FlorisInterface/IEA_15mw_rotor.csv
+!examples/examples_in/*
 
 Validation/
 
