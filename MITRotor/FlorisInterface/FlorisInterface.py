@@ -8,6 +8,7 @@ from scipy.interpolate import interp1d
 from floris.type_dec import floris_float_type, NDArrayFloat
 from floris.core.turbine.operation_models import BaseOperationModel
 from floris.core.rotor_velocity import average_velocity
+from floris.utilities import cosd
 # MITRotor / UMM Imports
 from MITRotor.ReferenceTurbines import IEA15MW
 from MITRotor.Momentum import UnifiedMomentum
@@ -88,6 +89,7 @@ class MITRotorTurbine(BaseOperationModel):
         tilt_angles: NDArrayFloat,
         average_method: str = "cubic-mean",
         cubature_weights: Optional[NDArrayFloat] = None,
+        power_thrust_table: Optional[dict] = None,
         **_,
     ):
         # create cache key for current inputs
@@ -103,22 +105,28 @@ class MITRotorTurbine(BaseOperationModel):
             self._power = np.empty((n_findex, n_turbines), dtype=floris_float_type)
 
             # compute the power-effective wind speed across the rotor
-            rotor_average_velocities = average_velocity(
+            rotor_average_velocities = average_velocity( # NOT adjusted for yaw
                 velocities=velocities,
                 method=average_method,
                 cubature_weights=cubature_weights,
             )
-
+            # self.farm.cosine_loss_exponent_yaw
+            pW = power_thrust_table["cosine_loss_exponent_yaw"] / 3.0
+            rotor_normal_average_velocities = rotor_average_velocities  * (cosd(yaw_angles) ** pW)
+            # rotor_normal_average_velocities = rotor_average_velocities * cosd(yaw_angles) * cosd(tilt_angles)
             # calculate rotor area
             rotor_area = np.pi * self.bem_model.rotor.R**2 
 
             # get setpoints
             yaw, tilt = np.deg2rad(yaw_angles), np.deg2rad(tilt_angles)
-            rotor_normal_average_velocities = np.cos(yaw) * np.cos(tilt) * rotor_average_velocities
             pitch = self.pitch_interp(rotor_normal_average_velocities)
             if not self.pitch_rad:
                 pitch = np.deg2rad(pitch)
             tsr = self.tsr_interp(rotor_normal_average_velocities)
+            print(np.mean(yaw_angles))
+            print(np.ravel(rotor_average_velocities))
+            print(np.ravel(pitch))
+            print(np.ravel(tsr))
             for tindex in range(n_turbines):
                 # solve BEM
                 bem_sol = self.bem_model(pitch[:, tindex], tsr[:, tindex], yaw = yaw[:, tindex], tilt = tilt[:, tindex])
@@ -126,7 +134,7 @@ class MITRotorTurbine(BaseOperationModel):
                 self._a[:, tindex] = bem_sol.a()
                 self._Ct[:, tindex] = bem_sol.Ct()
                 # compute power
-                self._power[:, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (rotor_normal_average_velocities[:, tindex])**3
+                self._power[:, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (rotor_average_velocities[:, tindex])**3
         return
     
     def power(self, **kwargs) -> NDArrayFloat:
