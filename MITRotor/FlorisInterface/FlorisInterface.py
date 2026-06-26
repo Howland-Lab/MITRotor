@@ -71,6 +71,7 @@ class MITRotorTurbine(BaseOperationModel):
     pitch_interp = field(init = True, factory = default_pitch_interp, type = interp1d, repr = False)
     pitch_rad = field(init = True, default = True, type = bool)
     tsr_interp = field(init = True, factory = default_tsr_interp, type = interp1d, repr = False)
+    rated_rotor_speed = field(init=True, default=None, type=Optional[float])  # rad/s
 
     # save most recent solution by unique floris arguments
     _last_key = field(init=False, default=None, type = bytes)
@@ -122,11 +123,17 @@ class MITRotorTurbine(BaseOperationModel):
             pitch = self.pitch_interp(rotor_normal_average_velocities)
             if not self.pitch_rad:
                 pitch = np.deg2rad(pitch)
-            tsr = self.tsr_interp(rotor_normal_average_velocities)
-            print(np.mean(yaw_angles))
-            print(np.ravel(rotor_average_velocities))
-            print(np.ravel(pitch))
-            print(np.ravel(tsr))
+
+            if self.rated_rotor_speed is None:
+                tsr = self.tsr_interp(rotor_normal_average_velocities)
+            else:
+                R = self.bem_model.rotor.R
+                tsr_lookup = self.tsr_interp(rotor_normal_average_velocities)
+                omega_lookup = tsr_lookup * rotor_normal_average_velocities / R  # rad/s implied by lookup
+                tsr_from_rated_speed = self.rated_rotor_speed * R / rotor_average_velocities  # above-rated branch
+                tsr = np.where(omega_lookup <= self.rated_rotor_speed, tsr_lookup, tsr_from_rated_speed)
+            tsr = np.maximum(tsr, 0.0)
+
             for tindex in range(n_turbines):
                 # solve BEM
                 bem_sol = self.bem_model(pitch[:, tindex], tsr[:, tindex], yaw = yaw[:, tindex], tilt = tilt[:, tindex])

@@ -198,3 +198,6 @@ pyrightconfig.json
 
 .DS_Store
 examples/Tune_Cases/
+*dbg*
+DISCON.IN
+*txt
