@@ -3,7 +3,7 @@ import numpy as np
 import polars as pl
 from attrs import define, field
 from typing import Optional
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, RegularGridInterpolator
 # FLORIS Imports
 from floris.type_dec import floris_float_type, NDArrayFloat
 from floris.core.turbine.operation_models import BaseOperationModel
@@ -15,6 +15,8 @@ from MITRotor.Momentum import UnifiedMomentum
 from MITRotor.Geometry import BEMGeometry
 from MITRotor.TipLoss import NoTipLoss
 from MITRotor.BEMSolver import BEM
+from MITRotor.FlorisInterface.ROSCOInterface import query_controls
+from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 # default rotor if none provided by user (IEA 15MW)
 def default_bem_factory():
@@ -66,18 +68,28 @@ class MITRotorTurbine(BaseOperationModel):
     """
     # user can define a BEM model if they want a different rotor, momentum model, or geometry
     bem_model = field(init = True, factory = default_bem_factory, type = BEM)
+    gen_eff = field(init = True, default = 95.756, type=Optional[float]) # [%]
+    eff_ratio = field(init=True, default=None, type=Optional[float])  # allow override
 
+    # TODO: figure out the default factory for the tsr and pitch!! Use saved file...
     # create interp objects based on pitch and tsr csvs
-    pitch_interp = field(init = True, factory = default_pitch_interp, type = interp1d, repr = False)
+    # pitch_interp = field(init = True, factory = default_pitch_interp, type = interp1d, repr = False)
+    pitch_interp = field(init = True, default = None, type = RegularGridInterpolator, repr = False)
     pitch_rad = field(init = True, default = True, type = bool)
-    tsr_interp = field(init = True, factory = default_tsr_interp, type = interp1d, repr = False)
-    rated_rotor_speed = field(init=True, default=None, type=Optional[float])  # rad/s
+    # tsr_interp = field(init = True, factory = default_tsr_interp, type = interp1d, repr = False)
+    tsr_interp = field(init = True, default = False, type = RegularGridInterpolator, repr = False)
+    rated_rotor_speed = field(init=True, default=None, type=Optional[float])  # [rad/s]
 
     # save most recent solution by unique floris arguments
     _last_key = field(init=False, default=None, type = bytes)
     _a = field(init=False, default=None, type = NDArrayFloat)
     _Ct = field(init=False, default=None, type = NDArrayFloat)
     _power = field(init=False, default=None, type = NDArrayFloat)
+
+    def __attrs_post_init__(self):
+        if self.eff_ratio is None:
+            gearbox_eff = self.bem_model.rotor.rosco_values[1]
+            self.eff_ratio = (self.gen_eff / 100.0) * (gearbox_eff / 100.0)
 
     def _get_state_key(self, velocities: np.ndarray, yaw_angles: np.ndarray, tilt_angles: np.ndarray) -> tuple:
         # saves key to uniquely identify farm state -> avoids re-solving for calls to power, thrust, and induction for same state
@@ -111,28 +123,27 @@ class MITRotorTurbine(BaseOperationModel):
                 method=average_method,
                 cubature_weights=cubature_weights,
             )
-            # self.farm.cosine_loss_exponent_yaw
-            pW = power_thrust_table["cosine_loss_exponent_yaw"] / 3.0
-            rotor_normal_average_velocities = rotor_average_velocities  * (cosd(yaw_angles) ** pW)
-            # rotor_normal_average_velocities = rotor_average_velocities * cosd(yaw_angles) * cosd(tilt_angles)
             # calculate rotor area
             rotor_area = np.pi * self.bem_model.rotor.R**2 
 
             # get setpoints
             yaw, tilt = np.deg2rad(yaw_angles), np.deg2rad(tilt_angles)
-            pitch = self.pitch_interp(rotor_normal_average_velocities)
+            eff_yaw = calc_eff_yaw(yaw, tilt)
+            pitch = query_controls(self.pitch_interp, rotor_average_velocities, eff_yaw)
+            tsr = query_controls(self.tsr_interp, rotor_average_velocities, eff_yaw)
+            # pitch = self.pitch_interp(rotor_normal_average_velocities)
             if not self.pitch_rad:
                 pitch = np.deg2rad(pitch)
 
-            if self.rated_rotor_speed is None:
-                tsr = self.tsr_interp(rotor_normal_average_velocities)
-            else:
-                R = self.bem_model.rotor.R
-                tsr_lookup = self.tsr_interp(rotor_normal_average_velocities)
-                omega_lookup = tsr_lookup * rotor_normal_average_velocities / R  # rad/s implied by lookup
-                tsr_from_rated_speed = self.rated_rotor_speed * R / rotor_average_velocities  # above-rated branch
-                tsr = np.where(omega_lookup <= self.rated_rotor_speed, tsr_lookup, tsr_from_rated_speed)
-            tsr = np.maximum(tsr, 0.0)
+            # if self.rated_rotor_speed is None:
+            #     tsr = self.tsr_interp(rotor_normal_average_velocities)
+            # else:
+            #     R = self.bem_model.rotor.R
+            #     tsr_lookup = self.tsr_interp(rotor_normal_average_velocities)
+            #     omega_lookup = tsr_lookup * rotor_normal_average_velocities / R  # rad/s implied by lookup
+            #     tsr_from_rated_speed = self.rated_rotor_speed * R / rotor_average_velocities  # above-rated branch
+            #     tsr = np.where(omega_lookup <= self.rated_rotor_speed, tsr_lookup, tsr_from_rated_speed)
+            # tsr = np.maximum(tsr, 0.0)
 
             for tindex in range(n_turbines):
                 # solve BEM
@@ -140,8 +151,12 @@ class MITRotorTurbine(BaseOperationModel):
                 # get induction and thrust coeff
                 self._a[:, tindex] = bem_sol.a()
                 self._Ct[:, tindex] = bem_sol.Ct()
-                # compute power
-                self._power[:, tindex] = 0.5 * bem_sol.Cp() * air_density * rotor_area * (rotor_average_velocities[:, tindex])**3
+                # compute power -> need generator efficiency
+                self._power[:, tindex] = (
+                    0.5 * bem_sol.Cp() * air_density * rotor_area
+                    * (rotor_average_velocities[:, tindex])**3
+                    * self.eff_ratio
+                )
         return
     
     def power(self, **kwargs) -> NDArrayFloat:
