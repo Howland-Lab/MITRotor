@@ -2,7 +2,7 @@ import os
 import numpy as np
 import polars as pl
 from attrs import define, field
-from typing import Optional
+from typing import Optional, Callable, Union
 from scipy.interpolate import interp1d, RegularGridInterpolator
 # FLORIS Imports
 from floris.type_dec import floris_float_type, NDArrayFloat
@@ -15,8 +15,10 @@ from MITRotor.Momentum import UnifiedMomentum
 from MITRotor.Geometry import BEMGeometry
 from MITRotor.TipLoss import NoTipLoss
 from MITRotor.BEMSolver import BEM
-from MITRotor.FlorisInterface.ROSCOInterface import query_controls
+from MITRotor.FlorisInterface.ROSCOInterface import query_controls_compat
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
+
+InterpLike = Union[interp1d, RegularGridInterpolator, Callable]
 
 # default rotor if none provided by user (IEA 15MW)
 def default_bem_factory():
@@ -74,10 +76,10 @@ class MITRotorTurbine(BaseOperationModel):
     # TODO: figure out the default factory for the tsr and pitch!! Use saved file...
     # create interp objects based on pitch and tsr csvs
     # pitch_interp = field(init = True, factory = default_pitch_interp, type = interp1d, repr = False)
-    pitch_interp = field(init = True, default = None, type = RegularGridInterpolator, repr = False)
+    pitch_interp = field(init=True, default=None, type=Optional[InterpLike], repr=False)
     pitch_rad = field(init = True, default = True, type = bool)
     # tsr_interp = field(init = True, factory = default_tsr_interp, type = interp1d, repr = False)
-    tsr_interp = field(init = True, default = False, type = RegularGridInterpolator, repr = False)
+    tsr_interp   = field(init=True, default=None, type=Optional[InterpLike], repr=False)
     rated_rotor_speed = field(init=True, default=None, type=Optional[float])  # [rad/s]
 
     # save most recent solution by unique floris arguments
@@ -90,6 +92,10 @@ class MITRotorTurbine(BaseOperationModel):
         if self.eff_ratio is None:
             gearbox_eff = self.bem_model.rotor.rosco_values[1]
             self.eff_ratio = (self.gen_eff / 100.0) * (gearbox_eff / 100.0)
+        if self.pitch_interp is None:
+            self.pitch_interp = default_pitch_interp()   # 1D legacy default
+        if self.tsr_interp is None:
+            self.tsr_interp = default_tsr_interp()       # 1D legacy default
 
     def _get_state_key(self, velocities: np.ndarray, yaw_angles: np.ndarray, tilt_angles: np.ndarray) -> tuple:
         # saves key to uniquely identify farm state -> avoids re-solving for calls to power, thrust, and induction for same state
@@ -129,8 +135,15 @@ class MITRotorTurbine(BaseOperationModel):
             # get setpoints
             yaw, tilt = np.deg2rad(yaw_angles), np.deg2rad(tilt_angles)
             eff_yaw = calc_eff_yaw(yaw, tilt)
-            pitch = query_controls(self.pitch_interp, rotor_average_velocities, eff_yaw)
-            tsr = query_controls(self.tsr_interp, rotor_average_velocities, eff_yaw)
+            # pitch = query_controls(self.pitch_interp, rotor_average_velocities, eff_yaw)
+            # tsr = query_controls(self.tsr_interp, rotor_average_velocities, eff_yaw)
+            pitch = query_controls_compat(
+                self.pitch_interp, rotor_average_velocities, eff_yaw, kind = "pitch"
+            )
+            tsr = query_controls_compat(
+                self.tsr_interp, rotor_average_velocities, eff_yaw, kind = "tsr",
+                rated_rotor_speed = self.rated_rotor_speed, rotor_radius = self.bem_model.rotor.R,
+            )
             # pitch = self.pitch_interp(rotor_normal_average_velocities)
             if not self.pitch_rad:
                 pitch = np.deg2rad(pitch)
@@ -170,3 +183,5 @@ class MITRotorTurbine(BaseOperationModel):
     def axial_induction(self, **kwargs) -> NDArrayFloat:
         self._update_solution(**kwargs)
         return self._a
+    
+    # near_wake_velocities

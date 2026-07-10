@@ -16,6 +16,8 @@ floris = {git = "https://github.com/misi9170/floris.git", branch = "feature/user
 rosco = "^2.10.4"
 ruamel-yaml = "^0.19.1"
 seaborn = "^0.13.2"
+joblib = "^1.5.3"
+tqdm-joblib = "^0.0.5"
 
 [tool.poetry.group.dev.dependencies]
 black = { extras = ["jupyter"], version = "^23.9.1" }
