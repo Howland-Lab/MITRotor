@@ -128,11 +128,8 @@ class BEMSolution:
         Ctprime = self.Ct(grid="sector") / ((1 - self.a(grid="sector")) ** 2 * np.cos(eff_yaw) ** 2)
         return average(self.geom, Ctprime, grid=grid)
     
-    # TODO: make sure that this is correct!! Check with np.isclose(Cp, tsr * Cq)
     def Cq(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
-        mu = np.asarray(self.geom.mu_mesh)
-        Ctau = self.Ctau_uncorr(grid="sector")
-        dCq = mu * Ctau
+        dCq = (self.geom.mu_mesh * self.Ctau_uncorr(grid="sector"))
         return average(self.geom, dCq, grid=grid)
 
 

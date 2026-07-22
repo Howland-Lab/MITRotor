@@ -281,7 +281,7 @@ class UnifiedMomentum(MomentumModel):
 
         self.model_Ct = (
             model_Ct if model_Ct is not None
-            else UMM.ThrustBasedUnified(beta=beta)
+            else UMM.ThrustBasedUnified(beta_s=beta)
         )
 
     def compute_induction(self, Cx: ArrayLike, yaw: float = 0.0, tilt: float = 0.0) -> ArrayLike:
@@ -296,7 +296,7 @@ class UnifiedMomentum(MomentumModel):
 # Look-up table for unified model
 def func_Ct(x, beta, cached) -> dict:
     Ct, eff_yaw = x
-    model_Ct = UMM.ThrustBasedUnified(beta = beta, cached=cached)
+    model_Ct = UMM.ThrustBasedUnified(beta_s = beta, cached=cached)
     sol = model_Ct(Ct, np.deg2rad(np.round(eff_yaw, 2)))
     return dict(
         Ct=Ct,
@@ -330,7 +330,7 @@ class ThrustBasedUnifiedLUT(CachedLUT, UMM.MomentumBase):
             as described in UMM documentation, yaw and tilt can be combined into an "effective yaw"
             the cache uses effective yaw, so these values should cover the range of effective yaws you
             want. You can use UnifiedMomentumModel.Utilities.Geometry.calc_eff_yaw to find
-        - beta (float, optional) - used in UMM
+        - beta_s (float, optional) - used in UMM
         - cached (boolean, optional) - cache nonlinear pressure in UMM
     """
     def __init__(self, cache_fn: Path = CACHE_FN_CT, regenerate=False, s=0.025,

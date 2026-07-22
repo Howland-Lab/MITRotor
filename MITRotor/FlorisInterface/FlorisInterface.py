@@ -15,7 +15,7 @@ from MITRotor.Momentum import UnifiedMomentum
 from MITRotor.Geometry import BEMGeometry
 from MITRotor.TipLoss import NoTipLoss
 from MITRotor.BEMSolver import BEM
-from MITRotor.FlorisInterface.ROSCOInterface import query_controls_compat
+from MITRotor.FlorisInterface.ROSCOInterface import query_controls
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 InterpLike = Union[interp1d, RegularGridInterpolator, Callable]
@@ -28,7 +28,7 @@ def default_bem_factory():
         geometry=BEMGeometry(Nr=10, Ntheta=20),
         tiploss_model=NoTipLoss()
     )
-# pitch vs windspeed interpolater if none provided by user
+# default 1D pitch vs windspeed interpolater if none provided by user
 # for IEA 15MW from figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
 def default_pitch_interp():
     module_dir = os.path.dirname(__file__)
@@ -39,7 +39,7 @@ def default_pitch_interp():
     # TODO: should fill_value be extrapolate?
     return interp1d(wind_table, pitch_table, kind="linear", fill_value="extrapolate", bounds_error=False)
 
-# tsr vs windspeed interpolater if none provided by user
+# default 1D tsr vs windspeed interpolater if none provided by user
 # for IEA 15MW from figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
 def default_tsr_interp():
     module_dir = os.path.dirname(__file__)
@@ -58,10 +58,14 @@ class MITRotorTurbine(BaseOperationModel):
 
     Args:
         bem_model (BEM): optional BEM model as defined in MITRotor, defaults to IEA15MW with UMM momentum model
-        pitch_interp (interp1d): optional 1D interpolator for pitch trajectory based on wind speed,
-            defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
+        pitch_interp (interp1d): optional 1D or 2D interpolator for pitch trajectory based on wind speed,
+            if 1D by wind speed then yaw not accounted for, if 2D then wind speed and yaw accounted for. 
+            Defaults to 1D IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf).
+            See ROSCOInterface.py for information on how to generate 2D control scheme interpolator.
         tsr_interp (interp1d): optional  1D interpolator for tsr trajectory based on wind speed,
-            defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf)
+            if 1D by wind speed then yaw not accounted for, if 2D then wind speed and yaw accounted for. 
+            Defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf).
+            See ROSCOInterface.py for information on how to generate 2D control scheme interpolator.
 
     Methods:
         power
@@ -73,21 +77,22 @@ class MITRotorTurbine(BaseOperationModel):
     gen_eff = field(init = True, default = 95.756, type=Optional[float]) # [%]
     eff_ratio = field(init=True, default=None, type=Optional[float])  # allow override
 
-    # TODO: figure out the default factory for the tsr and pitch!! Use saved file...
     # create interp objects based on pitch and tsr csvs
-    # pitch_interp = field(init = True, factory = default_pitch_interp, type = interp1d, repr = False)
-    pitch_interp = field(init=True, default=None, type=Optional[InterpLike], repr=False)
+    pitch_interp = field(init = True, factory = default_pitch_interp, type = Optional[InterpLike], repr = False)
     pitch_rad = field(init = True, default = True, type = bool)
-    # tsr_interp = field(init = True, factory = default_tsr_interp, type = interp1d, repr = False)
-    tsr_interp   = field(init=True, default=None, type=Optional[InterpLike], repr=False)
-    rated_rotor_speed = field(init=True, default=None, type=Optional[float])  # [rad/s]
+    tsr_interp   = field(init = True, factory = default_tsr_interp, type = Optional[InterpLike], repr=False)
+    rated_rotor_speed = field(init = True, default = None, type = Optional[float])  # [rad/s]
 
     # save most recent solution by unique floris arguments
     _last_key = field(init=False, default=None, type = bytes)
     _a = field(init=False, default=None, type = NDArrayFloat)
     _Ct = field(init=False, default=None, type = NDArrayFloat)
+    _u4 = field(init=False, default=None, type = NDArrayFloat)
+    _v4 = field(init=False, default=None, type = NDArrayFloat)
+    _w4 = field(init=False, default=None, type = NDArrayFloat)
     _power = field(init=False, default=None, type = NDArrayFloat)
 
+    # calculate a few needed fields post-initialization
     def __attrs_post_init__(self):
         if self.eff_ratio is None:
             gearbox_eff = self.bem_model.rotor.rosco_values[1]
@@ -121,6 +126,9 @@ class MITRotorTurbine(BaseOperationModel):
             self._last_key = key
             self._a = np.empty((n_findex, n_turbines), dtype=floris_float_type)
             self._Ct = np.empty((n_findex, n_turbines), dtype=floris_float_type)
+            self._u4 = np.empty((n_findex, n_turbines), dtype=floris_float_type)
+            self._v4 = np.empty((n_findex, n_turbines), dtype=floris_float_type)
+            self._w4 = np.empty((n_findex, n_turbines), dtype=floris_float_type)
             self._power = np.empty((n_findex, n_turbines), dtype=floris_float_type)
 
             # compute the power-effective wind speed across the rotor
@@ -135,36 +143,29 @@ class MITRotorTurbine(BaseOperationModel):
             # get setpoints
             yaw, tilt = np.deg2rad(yaw_angles), np.deg2rad(tilt_angles)
             eff_yaw = calc_eff_yaw(yaw, tilt)
-            # pitch = query_controls(self.pitch_interp, rotor_average_velocities, eff_yaw)
-            # tsr = query_controls(self.tsr_interp, rotor_average_velocities, eff_yaw)
-            pitch = query_controls_compat(
+
+            pitch = query_controls(
                 self.pitch_interp, rotor_average_velocities, eff_yaw, kind = "pitch"
             )
-            tsr = query_controls_compat(
+            tsr = query_controls(
                 self.tsr_interp, rotor_average_velocities, eff_yaw, kind = "tsr",
                 rated_rotor_speed = self.rated_rotor_speed, rotor_radius = self.bem_model.rotor.R,
             )
-            # pitch = self.pitch_interp(rotor_normal_average_velocities)
             if not self.pitch_rad:
                 pitch = np.deg2rad(pitch)
 
-            # if self.rated_rotor_speed is None:
-            #     tsr = self.tsr_interp(rotor_normal_average_velocities)
-            # else:
-            #     R = self.bem_model.rotor.R
-            #     tsr_lookup = self.tsr_interp(rotor_normal_average_velocities)
-            #     omega_lookup = tsr_lookup * rotor_normal_average_velocities / R  # rad/s implied by lookup
-            #     tsr_from_rated_speed = self.rated_rotor_speed * R / rotor_average_velocities  # above-rated branch
-            #     tsr = np.where(omega_lookup <= self.rated_rotor_speed, tsr_lookup, tsr_from_rated_speed)
-            # tsr = np.maximum(tsr, 0.0)
-
+            # solve BEM for setpoints from control curves
             for tindex in range(n_turbines):
                 # solve BEM
                 bem_sol = self.bem_model(pitch[:, tindex], tsr[:, tindex], yaw = yaw[:, tindex], tilt = tilt[:, tindex])
                 # get induction and thrust coeff
                 self._a[:, tindex] = bem_sol.a()
                 self._Ct[:, tindex] = bem_sol.Ct()
-                # compute power -> need generator efficiency
+                # get near wake velocities
+                self._u4 = bem_sol.u4,
+                self._v4 = bem_sol.v4
+                self._w4 = bem_sol.w4 
+                # compute power 
                 self._power[:, tindex] = (
                     0.5 * bem_sol.Cp() * air_density * rotor_area
                     * (rotor_average_velocities[:, tindex])**3
@@ -184,4 +185,6 @@ class MITRotorTurbine(BaseOperationModel):
         self._update_solution(**kwargs)
         return self._a
     
-    # near_wake_velocities
+    def near_wake_velocities(self, **kwargs) -> NDArrayFloat:
+        self._update_solution(**kwargs)
+        return (self._u4, self._v4, self._w4)

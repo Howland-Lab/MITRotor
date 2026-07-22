@@ -66,7 +66,7 @@ def load_from_mitrotor(
     turbine.J = turbine.rotor_inertia + turbine.generator_inertia * turbine.Ng**2
     turbine.rated_torque = turbine.rated_power/(turbine.GenEff/100*turbine.rated_rotor_speed*turbine.Ng)
 
-    # Generate the look-up tables, mesh the grid and flatten the arrays for aerodynamic analysis
+    # Generate the look-up tables; mesh the grid and flatten the arrays for aerodynamic analysis
     TSR_initial = np.arange(0.5, 25., 0.5)
     pitch_initial = np.arange(0.0, 31., 1.0)
     pitch_initial_rad = np.deg2rad(pitch_initial)
@@ -112,6 +112,177 @@ def load_from_mitrotor(
 # -----------------------------
 # Generate control scheme
 # -----------------------------
+def get_rosco_control_interps(
+    rosco_yaml, bem,
+    TurbineName="IEA15MW", rotor_performance_filename='Cp_Ct_Cq.txt', SimName="Sim1",
+    GenEff=95.756, generator_inertia=1836784,
+    regenerate=False,
+    save_control_file=None,
+    save_dir=".",
+    dt=0.05,
+    yaw_grid_deg=np.arange(0.0, 25.0, 1.0),  # degrees
+    n_jobs=-1,                                 # parallel workers across wind speeds
+):
+    """
+    Creates pitch and tsr 2D interpolators using ROSCO controller tuning.
+    Parallelized over wind speeds; yaws for each wind are solved sequentially
+    in one worker with warm-start chaining.
+    """
+
+    # Load ROSCO inputs and make basic turbine
+    inps = load_rosco_yaml(rosco_yaml)
+    turbine_params = inps['turbine_params']
+    turbine = ROSCO_turbine.Turbine(turbine_params)
+
+    # If control csv exists and do not want to regenerate, load old csv
+    if not regenerate and save_control_file is not None:
+        pitch_interp, tsr_interp = load_control_interps_from_csv(save_control_file)
+        return pitch_interp, tsr_interp, turbine.rated_rotor_speed
+
+    # Load and check control parameters
+    controller_params = inps['controller_params']
+    if (controller_params["WE_Mode"] != 0) or (controller_params["WE_Mode"] != 2):
+        warnings.warn(
+            "We suggest using WE_Mode = 0 or WE_Mode = 2 within the control parameter file.",
+            UserWarning,
+        )
+
+    # Generate turbine Cp/Ct surfaces
+    turbine = load_from_mitrotor(
+        turbine, bem,
+        TurbineName=TurbineName, rotor_performance_filename=rotor_performance_filename,
+        generator_inertia=generator_inertia, GenEff=GenEff,
+        yaw=0.0,
+    )
+
+    # Save turbine Cp/Ct surface
+    cp_filename = turbine.rotor_performance_filename
+    write_rotor_performance(turbine, txt_filename=cp_filename)
+
+    # Make and tune controller
+    controller = ROSCO_controller.Controller(controller_params)
+    controller.tune_controller(turbine)
+
+    # Write parameter input file
+    param_filename = os.path.join(save_dir, 'DISCON.IN')
+    write_DISCON(
+        turbine, controller,
+        param_file=param_filename,
+        txt_filename=cp_filename
+    )
+
+    # Tuned initial setpoints
+    init_pitch_list = np.rad2deg(np.maximum(controller.pitch_op, controller.ps_min_bld_pitch))
+    init_tsr_list = controller.TSR_op
+
+    # Create parameter tables
+    v_grid = controller.v.copy()
+    yaw_grid_deg = np.sort(np.asarray(yaw_grid_deg, dtype=float))
+    yaw_grid_rad = np.deg2rad(yaw_grid_deg)
+
+    pitch_tbl = np.full((len(v_grid), len(yaw_grid_rad)), np.nan, dtype=float)
+    tsr_tbl   = np.full_like(pitch_tbl, np.nan)
+    power_tbl = np.full_like(pitch_tbl, np.nan)
+
+    # Lightweight turbine object for worker pickling
+    turbine_sim = SimpleNamespace(
+        rotor_radius=float(turbine.rotor_radius),
+        rho=float(turbine.rho),
+        Ng=float(turbine.Ng),
+        J=float(turbine.J),
+        GBoxEff=float(turbine.GBoxEff),
+        GenEff=float(turbine.GenEff),
+    )
+
+    # Calculate total number of cases
+    n_wind = len(v_grid)
+    n_yaw = len(yaw_grid_rad)
+    total_cases = n_wind * n_yaw
+
+    # Determine effective n_jobs
+    if n_jobs is None:
+        n_jobs_eff = 1
+    elif n_jobs == -1:
+        n_jobs_eff = min(os.cpu_count() or 1, n_wind)
+    else:
+        n_jobs_eff = max(1, min(int(n_jobs), n_wind))
+
+    # Run parallel (fallback to serial on failure, e.g., pickling issue)
+    print(
+        f"Starting control LUT sweep: {n_wind} wind-row tasks "
+        f"({total_cases} wind-yaw cases), using {n_jobs_eff} worker process(es)."
+    )
+
+    def _run_serial(desc):
+        out = []
+        for i, v in enumerate(tqdm(v_grid, total=n_wind, desc=desc, dynamic_ncols=True)):
+            out.append(
+                _run_one_wind_row(
+                    i, v, yaw_grid_rad, init_pitch_list[i], init_tsr_list[i],
+                    turbine_sim, bem, param_filename, dt, SimName
+                )
+            )
+        return out
+
+    rows = None
+    if n_jobs_eff > 1:
+        bar = tqdm(total=n_wind, desc="Control LUT sweep (wind rows)", dynamic_ncols=True)
+        try:
+            with tqdm_joblib(bar):
+                rows = Parallel(n_jobs=n_jobs_eff, backend="loky", verbose=0, batch_size=1)(
+                    delayed(_run_one_wind_row)(
+                        i, v, yaw_grid_rad, init_pitch_list[i], init_tsr_list[i],
+                        turbine_sim, bem, param_filename, dt, SimName
+                    )
+                    for i, v in enumerate(v_grid)
+                )
+        except Exception as e:
+            warnings.warn(
+                f"Parallel execution failed ({type(e).__name__}: {e}). "
+                "Falling back to serial execution.",
+                RuntimeWarning,
+            )
+        finally:
+            bar.close()
+    if rows is None:
+        desc = "Control LUT sweep (serial fallback)" if n_jobs_eff > 1 else "Control LUT sweep (serial)"
+        rows = _run_serial(desc)
+
+    # Collect setpoints
+    for i, pitch_row, tsr_row, power_row in rows:
+        pitch_tbl[i, :] = pitch_row
+        tsr_tbl[i, :]   = tsr_row
+        power_tbl[i, :] = power_row
+
+    # Optional CSV save
+    if save_control_file is not None:
+        save_control_file = Path(save_control_file)
+        save_control_file.parent.mkdir(parents=True, exist_ok=True)
+
+        vv, yy = np.meshgrid(v_grid, yaw_grid_rad, indexing="ij")
+        data = np.column_stack([
+            vv.ravel(),            # wind_speed_mps
+            yy.ravel(),            # yaw_rad
+            pitch_tbl.ravel(),     # pitch_rad
+            tsr_tbl.ravel(),       # tsr
+            power_tbl.ravel(),     # generated power
+        ])
+
+        header = "wind_speed_mps,yaw_rad,pitch_rad,tsr,gen_power"
+        np.savetxt(save_control_file, data, delimiter=",", header=header, comments="")
+
+    # Make interpolators
+    pitch_interp = RegularGridInterpolator(
+        (v_grid, yaw_grid_rad), pitch_tbl,
+        method="linear", bounds_error=False, fill_value=None
+    )
+    tsr_interp = RegularGridInterpolator(
+        (v_grid, yaw_grid_rad), tsr_tbl,
+        method="linear", bounds_error=False, fill_value=None
+    )
+
+    return pitch_interp, tsr_interp, turbine.rated_rotor_speed
+
 def _run_one_wind_row(
     i, v, yaw_grid_rad, init_pitch_deg0, init_tsr0,
     turbine_sim, bem, param_filename, dt, SimName
@@ -183,339 +354,6 @@ def _run_one_wind_row(
     return i, pitch_row, tsr_row, power_row
 
 
-# def get_rosco_control_interps(
-#     rosco_yaml, bem,
-#     TurbineName = "IEA15MW", rotor_performance_filename = 'Cp_Ct_Cq.txt', SimName = "Sim1",
-#     GenEff = 95.756, generator_inertia = 1836784,
-#     regenerate = False,
-#     save_control_file = None,
-#     save_dir = ".",
-#     dt = 0.05,
-#     yaw_grid_deg = np.arange(0.0, 25.0, 1.0), # in degrees
-# ):
-#     """
-#     Creates pitch and tsr 2D interpolators using ROSCO controller tuning.
-
-#     Creates turbine and controller. Controller is tuned on yaw = 0 Cp/Ct surfaces from MITRotor.
-#     ROSCO simulation with controller and turbrine is then run for each (wind_speed, yaw) combination
-#     till steady state. Steady-state set points are made into a 2D interpolator and optionally saved to
-#     a CSV.
-
-#     Args:
-#         rosco_yaml (string): yaml file (+path) that defineds turbine and control parameters;
-#             [see MITRotor/ReferenceTurbines/ROSCO_IEA15MW.yaml for example]
-#         bem (MITRotor.BEM): MITRotor BEM object
-#         TurbineName (string): string turbine name; default to "IEA15MW"
-#         GenEff (float): generator efficiency (0-100); defaults to IEA15MW value 95.756
-#         generator_inertia (float): generator_inertia; defaults to IEA15MW value 1836784 [kg m^2]
-#         save_control_file (string): file name (+path) of saved look-up table value; if None (default) then not saved
-#         regenerate (bool): if True, then regenerate control path, else use saved in save_control_file; if save_control_file is None, set to True
-#         save_dir (string): path to save all files output when creating the interpolaters
-#         dt (float): timestep for ROSCO simulation; default = 0.05 seconds
-
-#     Returns:
-#         pitch_interp (string): 1D pitch interpolator from wind speed tuned with ROSCO control paramters
-#         tsr_interp (string): 1D tsr interpolator from wind speed tuned with ROSCO control paramters
-#         rated_rotor_speed (float): rated rotor speed value
-#     """
-
-#     # load ROSCO inputs and make basic turbine
-#     inps = load_rosco_yaml(rosco_yaml)
-#     turbine_params = inps['turbine_params']
-#     turbine = ROSCO_turbine.Turbine(turbine_params)
-
-#     # if control csv exists and do not want to regenerate, load old csv
-#     if not regenerate and save_control_file is not None:
-#         pitch_interp, tsr_interp = load_control_interps_from_csv(save_control_file)
-#         return pitch_interp, tsr_interp, turbine.rated_rotor_speed
-
-#     # load and check control parameters
-#     controller_params = inps['controller_params']
-#     if controller_params["WE_Mode"] != 0:
-#         warnings.warn(
-#             "Using wind speed estimators in this simple simulation is known to cause problems. We suggest using WE_Mode = 0.",
-#             UserWarning,
-#         )
-
-#     # generate turbine Cp/Ct surfaces
-#     turbine = load_from_mitrotor(
-#         turbine, bem,
-#         TurbineName = TurbineName, rotor_performance_filename = rotor_performance_filename,
-#         generator_inertia = generator_inertia, GenEff = GenEff,
-#         yaw = 0.0,
-#     )
-#     # save turbine Cp/Ct surface
-#     cp_filename = turbine.rotor_performance_filename
-#     write_rotor_performance(turbine, txt_filename=cp_filename)
-
-#     # make and tune controller
-#     controller = ROSCO_controller.Controller(controller_params)
-#     controller.tune_controller(turbine)
-
-#     # Write parameter input file
-#     param_filename = os.path.join(save_dir,'DISCON.IN')
-#     write_DISCON(
-#         turbine,controller,
-#         param_file=param_filename, 
-#         txt_filename=cp_filename
-#     )
-
-#     # load initial setpoints from tuned controller
-#     init_pitch_list = np.rad2deg(np.maximum(controller.pitch_op, controller.ps_min_bld_pitch))
-#     init_tsr_list = controller.TSR_op
-
-#     # load/set values for interpolator axes
-#     v_grid = controller.v.copy()
-#     yaw_grid_deg = np.asarray(yaw_grid_deg, dtype=float)
-#     yaw_grid_rad = np.deg2rad(yaw_grid_deg)
-
-#     pitch_tbl = np.zeros((len(v_grid), len(yaw_grid_rad)))
-#     tsr_tbl   = np.zeros_like(pitch_tbl)
-#     power_tbl   = np.zeros_like(pitch_tbl)
-
-#     # needed constants
-#     R = turbine.rotor_radius
-#     GBRatio = turbine.Ng
-  
-#     # loop through interpolator axes and find setpoints using ROSCO simulation
-#     for (i, v) in enumerate(v_grid):
-#         # initial guess setpoints based on tuned controller
-#         init_pitch = init_pitch_list[i]
-#         init_tsr = init_tsr_list[i]
-#         init_omega =  init_tsr * v / R
-#         init_gen = init_omega * GBRatio
-#         # loop through yaw
-#         for (j, yaw_rad) in enumerate(yaw_grid_rad):
-#             # create controller interface
-#             controller_int = WarmStartControllerInterface(
-#                 lib_name,
-#                 param_filename=param_filename,
-#                 sim_name=f"{SimName}_{i}_{j}",
-#                 DT=dt,
-#                 init_ws=v,
-#                 init_rot_speed=init_omega,
-#                 init_gen_speed=init_gen,
-#                 init_pitch_deg=init_pitch,   # init_pitch is in deg
-#                 init_torque=0.0,
-#                 init_nac_imu=yaw_rad, # init_nac_imu is rad
-#             )
-
-#             # create the ROSCO simulation
-#             sim = ROSCO_sim.Sim(turbine, controller_int)
-#             # run the simulation to steady state
-#             sim_ws_mitrotor(
-#                 sim=sim, bem=bem, ws=v, dt=dt,
-#                 init_tsr=init_tsr,
-#                 init_pitch=init_pitch,   # deg
-#                 yaw_init=yaw_rad,        # rad
-#                 wd=0.0, 
-#             )
-#             # save setpoints in 2D tables
-#             pitch_tbl[i, j] = sim.bld_pitch
-#             tsr_tbl[i, j]   = sim.tsr
-#             power_tbl[i, j] = sim.gen_power
-
-#     # save CSV of  (optional)
-#     if save_control_file is not None:
-#         save_control_file = Path(save_control_file)
-#         save_control_file.parent.mkdir(parents=True, exist_ok=True)
-
-#         vv, yy = np.meshgrid(v_grid, yaw_grid_rad, indexing="ij")
-#         data = np.column_stack([
-#             vv.ravel(),                    # wind_speed_mps
-#             yy.ravel(),                    # yaw_rad
-#             pitch_tbl.ravel(),             # pitch_rad
-#             tsr_tbl.ravel(),               # tsr
-#             power_tbl.ravel(),             # generated power
-#         ])
-
-#         header = "wind_speed_mps,yaw_rad,pitch_rad,tsr,gen_power"
-#         np.savetxt(save_control_file, data, delimiter=",", header=header, comments="")
-
-#     # Direct 2D interpolators, no custom wrapper
-#     pitch_interp = RegularGridInterpolator(
-#         (v_grid, yaw_grid_rad), pitch_tbl,
-#         method="linear", bounds_error=False, fill_value=None
-#     )
-#     tsr_interp = RegularGridInterpolator(
-#         (v_grid, yaw_grid_rad), tsr_tbl,
-#         method="linear", bounds_error=False, fill_value=None
-#     )
-
-#     return pitch_interp, tsr_interp, turbine.rated_rotor_speed
-
-def get_rosco_control_interps(
-    rosco_yaml, bem,
-    TurbineName="IEA15MW", rotor_performance_filename='Cp_Ct_Cq.txt', SimName="Sim1",
-    GenEff=95.756, generator_inertia=1836784,
-    regenerate=False,
-    save_control_file=None,
-    save_dir=".",
-    dt=0.05,
-    yaw_grid_deg=np.arange(0.0, 25.0, 1.0),  # degrees
-    n_jobs=-1,                                 # parallel workers across wind speeds
-):
-    """
-    Creates pitch and tsr 2D interpolators using ROSCO controller tuning.
-    Parallelized over wind speeds; yaws for each wind are solved sequentially
-    in one worker with warm-start chaining.
-    """
-
-    # load ROSCO inputs and make basic turbine
-    inps = load_rosco_yaml(rosco_yaml)
-    turbine_params = inps['turbine_params']
-    turbine = ROSCO_turbine.Turbine(turbine_params)
-
-    # if control csv exists and do not want to regenerate, load old csv
-    if not regenerate and save_control_file is not None:
-        pitch_interp, tsr_interp = load_control_interps_from_csv(save_control_file)
-        return pitch_interp, tsr_interp, turbine.rated_rotor_speed
-
-    # load and check control parameters
-    controller_params = inps['controller_params']
-    if controller_params["WE_Mode"] != 0:
-        warnings.warn(
-            "Using wind speed estimators in this simple simulation is known to cause problems. "
-            "We suggest using WE_Mode = 0.",
-            UserWarning,
-        )
-
-    # generate turbine Cp/Ct surfaces
-    turbine = load_from_mitrotor(
-        turbine, bem,
-        TurbineName=TurbineName, rotor_performance_filename=rotor_performance_filename,
-        generator_inertia=generator_inertia, GenEff=GenEff,
-        yaw=0.0,
-    )
-
-    # save turbine Cp/Ct surface
-    cp_filename = turbine.rotor_performance_filename
-    write_rotor_performance(turbine, txt_filename=cp_filename)
-
-    # make and tune controller
-    controller = ROSCO_controller.Controller(controller_params)
-    controller.tune_controller(turbine)
-
-    # Write parameter input file
-    param_filename = os.path.join(save_dir, 'DISCON.IN')
-    write_DISCON(
-        turbine, controller,
-        param_file=param_filename,
-        txt_filename=cp_filename
-    )
-
-    # tuned initial setpoints
-    init_pitch_list = np.rad2deg(np.maximum(controller.pitch_op, controller.ps_min_bld_pitch))
-    init_tsr_list = controller.TSR_op
-
-    # axes
-    v_grid = controller.v.copy()
-    yaw_grid_deg = np.sort(np.asarray(yaw_grid_deg, dtype=float))
-    yaw_grid_rad = np.deg2rad(yaw_grid_deg)
-
-    pitch_tbl = np.full((len(v_grid), len(yaw_grid_rad)), np.nan, dtype=float)
-    tsr_tbl   = np.full_like(pitch_tbl, np.nan)
-    power_tbl = np.full_like(pitch_tbl, np.nan)
-
-    # lightweight turbine object for worker pickling
-    turbine_sim = SimpleNamespace(
-        rotor_radius=float(turbine.rotor_radius),
-        rho=float(turbine.rho),
-        Ng=float(turbine.Ng),
-        J=float(turbine.J),
-        GBoxEff=float(turbine.GBoxEff),
-        GenEff=float(turbine.GenEff),
-    )
-
-    n_wind = len(v_grid)
-    n_yaw = len(yaw_grid_rad)
-    total_cases = n_wind * n_yaw
-
-    # determine effective n_jobs
-    if n_jobs is None:
-        n_jobs_eff = 1
-    elif n_jobs == -1:
-        n_jobs_eff = min(os.cpu_count() or 1, n_wind)
-    else:
-        n_jobs_eff = max(1, min(int(n_jobs), n_wind))
-
-    # run parallel (fallback to serial on failure, e.g., pickling issue)
-    print(
-        f"Starting control LUT sweep: {n_wind} wind-row tasks "
-        f"({total_cases} wind-yaw cases), using {n_jobs_eff} worker process(es)."
-    )
-
-    def _run_serial(desc):
-        out = []
-        for i, v in enumerate(tqdm(v_grid, total=n_wind, desc=desc, dynamic_ncols=True)):
-            out.append(
-                _run_one_wind_row(
-                    i, v, yaw_grid_rad, init_pitch_list[i], init_tsr_list[i],
-                    turbine_sim, bem, param_filename, dt, SimName
-                )
-            )
-        return out
-
-    rows = None
-    if n_jobs_eff > 1:
-        bar = tqdm(total=n_wind, desc="Control LUT sweep (wind rows)", dynamic_ncols=True)
-        try:
-            with tqdm_joblib(bar):
-                rows = Parallel(n_jobs=n_jobs_eff, backend="loky", verbose=0, batch_size=1)(
-                    delayed(_run_one_wind_row)(
-                        i, v, yaw_grid_rad, init_pitch_list[i], init_tsr_list[i],
-                        turbine_sim, bem, param_filename, dt, SimName
-                    )
-                    for i, v in enumerate(v_grid)
-                )
-        except Exception as e:
-            warnings.warn(
-                f"Parallel execution failed ({type(e).__name__}: {e}). "
-                "Falling back to serial execution.",
-                RuntimeWarning,
-            )
-        finally:
-            bar.close()
-    if rows is None:
-        desc = "Control LUT sweep (serial fallback)" if n_jobs_eff > 1 else "Control LUT sweep (serial)"
-        rows = _run_serial(desc)
-
-    # collect
-    for i, pitch_row, tsr_row, power_row in rows:
-        pitch_tbl[i, :] = pitch_row
-        tsr_tbl[i, :]   = tsr_row
-        power_tbl[i, :] = power_row
-
-    # optional CSV save
-    if save_control_file is not None:
-        save_control_file = Path(save_control_file)
-        save_control_file.parent.mkdir(parents=True, exist_ok=True)
-
-        vv, yy = np.meshgrid(v_grid, yaw_grid_rad, indexing="ij")
-        data = np.column_stack([
-            vv.ravel(),            # wind_speed_mps
-            yy.ravel(),            # yaw_rad
-            pitch_tbl.ravel(),     # pitch_rad
-            tsr_tbl.ravel(),       # tsr
-            power_tbl.ravel(),     # generated power
-        ])
-
-        header = "wind_speed_mps,yaw_rad,pitch_rad,tsr,gen_power"
-        np.savetxt(save_control_file, data, delimiter=",", header=header, comments="")
-
-    # interpolators
-    pitch_interp = RegularGridInterpolator(
-        (v_grid, yaw_grid_rad), pitch_tbl,
-        method="linear", bounds_error=False, fill_value=None
-    )
-    tsr_interp = RegularGridInterpolator(
-        (v_grid, yaw_grid_rad), tsr_tbl,
-        method="linear", bounds_error=False, fill_value=None
-    )
-
-    return pitch_interp, tsr_interp, turbine.rated_rotor_speed
-
-
 def load_control_interps_from_csv(csv_path):
     """
     Load wind/yaw control LUT CSV and return 2D interpolators.
@@ -552,32 +390,7 @@ def load_control_interps_from_csv(csv_path):
     return pitch_interp, tsr_interp
 
 
-# def query_controls(interp, ws, yaw_rad):
-#     """
-#     Vectorized query for 2D interpolator interp(ws, yaw).
-
-#     Supports:
-#       - scalar ws, scalar yaw -> float
-#       - array ws, scalar yaw -> array
-#       - scalar ws, array yaw -> array
-#       - array ws, array yaw (broadcastable shapes, including same-length 1D pairwise) -> array
-#     """
-#     ws_arr = np.asarray(ws, dtype=float)
-#     yaw_arr = np.asarray(yaw_rad, dtype=float)
-
-#     # Broadcast to common shape (or raise if incompatible)
-#     ws_b, yaw_b = np.broadcast_arrays(ws_arr, yaw_arr)
-
-#     # Build points for RegularGridInterpolator: shape (N, 2)
-#     pts = np.column_stack((ws_b.ravel(), yaw_b.ravel()))
-
-#     # Vectorized interpolation
-#     vals = np.asarray(interp(pts)).reshape(ws_b.shape)
-
-#     # Return float for scalar input, ndarray otherwise
-#     return float(vals) if vals.shape == () else vals
-
-def query_controls_compat(
+def query_controls(
     interp,
     ws,
     yaw_rad,
@@ -667,14 +480,11 @@ def sim_ws_mitrotor(
     t = 0.0
     converged = False
     last_metrics = None
-    # begin iteration
+    # Begin iteration
     while n_iter < max_iter:
         t += dt
 
-        # aero side
         tsr = rot_speed * R / max(ws, 1e-6)
-
-        # yaw misalignment for aero
         yaw_err = wd - nac_yaw
 
         # BEM call
@@ -685,7 +495,7 @@ def sim_ws_mitrotor(
         )
         cp = float(np.ravel(sol.Cp())[0])
 
-        # 1DOF rotor dynamics (same structure as ROSCO Sim)
+        # Rotor dynamics calculations (same as used in ROSCO's sim_ws_series function)
         aero_torque = 0.5 * rho * (np.pi * R**3) * (cp / max(tsr, 1e-6)) * ws**2
         rot_speed = rot_speed + (dt / J) * (aero_torque - Ng * gen_torque / gbox_eff)
         gen_speed = rot_speed * Ng
@@ -705,13 +515,13 @@ def sim_ws_mitrotor(
             "Y_MeasErr": yaw_err,
         }
 
-        # Controller outputs
+        # Controller call; torque, blade pitch, and yaw rate outputs
         gen_torque, bld_pitch, nac_yawrate = sim.controller_int.call_controller(turbine_state)
 
-        # Power
+        # Calculate power
         gen_power = gen_speed * gen_torque * gen_eff  # W
 
-        # Yaw dynamics
+        # Yaw dynamics update for if yaw-control is on
         nac_yaw += nac_yawrate * dt
 
         # Convergence tracking
@@ -737,6 +547,7 @@ def sim_ws_mitrotor(
 
     if not converged and verbose:
         print(f"WARNING: hit max_iter={max_iter} without convergence")
+
     # Kill controller
     sim.controller_int.kill_discon()
 
@@ -753,7 +564,9 @@ def sim_ws_mitrotor(
 
     return converged
 
-
+# -----------------------------
+# Controller Interface -> child of ROSCOS's ControllerInterface
+# -----------------------------
 class WarmStartControllerInterface(ROSCO_ci.ControllerInterface):
     """
     ROSCO controller interface with configurable warm-start initial conditions.
@@ -807,13 +620,14 @@ class WarmStartControllerInterface(ROSCO_ci.ControllerInterface):
             Additional keyword arguments forwarded to
             `ROSCO_ci.ControllerInterface` (e.g., `DT`, `sim_name`, etc.).
         """
+        # Set starting conditions
         self.init_ws = float(init_ws)
         self.init_rot_speed = float(init_rot_speed)
         self.init_gen_speed = float(init_gen_speed)
         self.init_torque = float(init_torque)
         self.init_nac_imu = float(init_nac_imu)
 
-        # parent uses self.pitch for initial blade pitch
+        # Parent uses self.pitch for initial blade pitch
         super().__init__(
             lib_name,
             param_filename=param_filename,
@@ -880,25 +694,30 @@ class WarmStartControllerInterface(ROSCO_ci.ControllerInterface):
         self.avrSWAP[50] = len(self.avcOUTNAME)
         self.avrSWAP[51] = self.char_buffer
 
-        with suppress_c_output():
+        with suppress_fortran_output():
             self.call_discon()   # iStatus=0 init call
 
         self.avrSWAP[0] = 1    # subsequent calls are normal
 
         if self.aviFAIL.value < 0:
             raise ValueError("ROSCO dynamic library has returned an error")
+        
     def kill_discon(self):
-        """Silent DISCON shutdown (suppresses ROSCO shutdown print spam)."""
+        """
+        Silent DISCON shutdown (suppresses ROSCO shutdown print spam).
+        Removes ROSCO FORTRAN output clean up terminal so MITRotor interface
+        outputs are visible.
+        """
         try:
-            with suppress_c_output():   # the context manager you already added
+            with suppress_fortran_output():   # context manager
                 super().kill_discon()
         except Exception:
             pass
         
 
 @contextmanager
-def suppress_c_output():
-    """Suppress C/Fortran prints (stdout/stderr) in this process."""
+def suppress_fortran_output():
+    """Suppress Fortran prints (stdout/stderr) in this process."""
     sys.stdout.flush()
     sys.stderr.flush()
 

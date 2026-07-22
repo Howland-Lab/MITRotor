@@ -22,7 +22,7 @@ from rosco.toolbox.inputs.validation import load_rosco_yaml
 from MITRotor.Momentum import UnifiedMomentumLUT
 from MITRotor import BEM, BEMGeometry, IEA15MW
 from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, default_bem_factory, default_pitch_interp, default_tsr_interp
-from MITRotor.FlorisInterface.ROSCOInterface import get_rosco_control_interps, query_controls_compat
+from MITRotor.FlorisInterface.ROSCOInterface import get_rosco_control_interps, query_controls
 
 figdir = Path("fig")
 
@@ -78,7 +78,7 @@ def main():
     cache_file = cache_dir / "lut.csv"
     lut_model = UnifiedMomentumLUT(
         cache_fn=cache_file,
-        regenerate=False,
+        regenerate=True,
         LUT_Cts=np.linspace(-0.5,1.5,40),
         LUT_yaws=np.linspace(0.0,40.0,40),
     )
@@ -95,25 +95,25 @@ def main():
     end = time.time()
     print(f"Time to make control CSV: {end - start}")
 
-    rosco_PS_Mode_0_pitch_interp, rosco_PS_Mode_0_tsr_interp, rosco_PS_Mode_0_rated_rotorspeed = change_control_param(
-        "PS_Mode", 0, rosco_yaml_PS_Mode_3, bem,
-        regenerate = True, save_control_file = "control_PS0.csv"
-    )
+    # rosco_PS_Mode_0_pitch_interp, rosco_PS_Mode_0_tsr_interp, rosco_PS_Mode_0_rated_rotorspeed = change_control_param(
+    #     "PS_Mode", 0, rosco_yaml_PS_Mode_3, bem,
+    #     regenerate = True, save_control_file = "control_PS0.csv"
+    # )
         
     # Plot IEA15MW control from ROSCO paper, ROSOC control with PS_Mode = 3, and ROSOC control with PS_Mode = 0
     pitch_abbas = abbas_pitch_interp(wind_speeds)
-    pitch_ps0 = np.rad2deg(rosco_PS_Mode_0_pitch_interp(wind_speeds))
-    pitch_ps3 = np.rad2deg(query_controls_compat(rosco_PS_Mode_3_pitch_interp, wind_speeds, 0.0))
+    # pitch_ps0 = np.rad2deg(rosco_PS_Mode_0_pitch_interp(wind_speeds))
+    pitch_ps3 = np.rad2deg(query_controls(rosco_PS_Mode_3_pitch_interp, wind_speeds, 0.0))
 
     tsr_abbas = abbas_tsr_interp(wind_speeds)
-    tsr_ps0 = rosco_PS_Mode_0_tsr_interp(wind_speeds)
-    tsr_ps3 = query_controls_compat(rosco_PS_Mode_3_tsr_interp, wind_speeds, 0.0)
+    # tsr_ps0 = rosco_PS_Mode_0_tsr_interp(wind_speeds)
+    tsr_ps3 = query_controls(rosco_PS_Mode_3_tsr_interp, wind_speeds, 0.0)
 
     # Create figure
     fig, ax = plt.subplots(1, 2, figsize = (10,4), sharey = True, constrained_layout=True)
     fig.suptitle(fr"Setpoint Trajectories")
     # Plot pitch
-    ax[0].plot(wind_speeds, pitch_ps0, label="ROSCO: PS_Mode = 0", lw=3)
+    # ax[0].plot(wind_speeds, pitch_ps0, label="ROSCO: PS_Mode = 0", lw=3)
     ax[0].plot(wind_speeds, pitch_ps3, label="ROSCO: PS_Mode = 3", lw=3, linestyle = "dashed")
     ax[0].plot(wind_speeds, pitch_abbas, label="Abbas et al. Fig 2", lw=3, linestyle = "dotted")
 
@@ -123,7 +123,7 @@ def main():
     ax[0].grid(True)
 
     # Plot TSR
-    ax[1].plot(wind_speeds, tsr_ps0, label="MITRotor+FLORIS+ROSCO: PS_Mode = 0", lw=3)
+    # ax[1].plot(wind_speeds, tsr_ps0, label="MITRotor+FLORIS+ROSCO: PS_Mode = 0", lw=3)
     ax[1].plot(wind_speeds, tsr_ps3, label="MITRotor+FLORIS+ROSCO: PS_Mode = 3", lw=3, linestyle = "dashed")
     ax[1].plot(wind_speeds, tsr_abbas, label="Abbas et al. ROSCO Control", lw=3, linestyle = "dotted")
 
@@ -147,13 +147,13 @@ def main():
         tsr_interp = abbas_tsr_interp,
     )
 
-    floris_PS_Mode_0_turbine = MITRotorTurbine(
-        bem_model = bem,
-        pitch_interp = rosco_PS_Mode_0_pitch_interp,
-        pitch_rad = True,
-        tsr_interp = rosco_PS_Mode_0_tsr_interp,
-        rated_rotor_speed = rosco_PS_Mode_0_rated_rotorspeed,
-    )
+    # floris_PS_Mode_0_turbine = MITRotorTurbine(
+    #     bem_model = bem,
+    #     pitch_interp = rosco_PS_Mode_0_pitch_interp,
+    #     pitch_rad = True,
+    #     tsr_interp = rosco_PS_Mode_0_tsr_interp,
+    #     rated_rotor_speed = rosco_PS_Mode_0_rated_rotorspeed,
+    # )
 
     floris_PS_Mode_3_turbine = MITRotorTurbine(
         bem_model = bem,
@@ -178,12 +178,12 @@ def main():
     Ct_abbas = fmodel_abbas.get_turbine_thrust_coefficients()
     Cp_abbas, P_abbas = get_turbine_power_coefficent(floris_abbas_turbine, fmodel_abbas, wind_speeds)
 
-    fmodel_PS_Mode_0 = FlorisModel("defaults")
-    fmodel_PS_Mode_0.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
-    fmodel_PS_Mode_0.set_operation_model(floris_PS_Mode_0_turbine)
-    fmodel_PS_Mode_0.run()
-    Ct_PS_Mode_0 = fmodel_PS_Mode_0.get_turbine_thrust_coefficients()
-    Cp_PS_Mode_0, P_PS_Mode_0 = get_turbine_power_coefficent(floris_PS_Mode_0_turbine, fmodel_PS_Mode_0, wind_speeds)
+    # fmodel_PS_Mode_0 = FlorisModel("defaults")
+    # fmodel_PS_Mode_0.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
+    # fmodel_PS_Mode_0.set_operation_model(floris_PS_Mode_0_turbine)
+    # fmodel_PS_Mode_0.run()
+    # Ct_PS_Mode_0 = fmodel_PS_Mode_0.get_turbine_thrust_coefficients()
+    # Cp_PS_Mode_0, P_PS_Mode_0 = get_turbine_power_coefficent(floris_PS_Mode_0_turbine, fmodel_PS_Mode_0, wind_speeds)
 
     fmodel_PS_Mode_3 = FlorisModel("defaults")
     fmodel_PS_Mode_3.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
@@ -203,10 +203,10 @@ def main():
         wind_speeds, Ct_abbas, label="FLORIS+MITROTOR Abbas et al. Control",
         lw=3, linestyle = "solid", zorder = 1,
     )
-    ax1.plot(
-        wind_speeds, Ct_PS_Mode_0, label="FLORIS+MITROTOR+ROSCO: PS_Mode = 0",
-        lw=3, linestyle = "dashed", zorder = 1,
-    )
+    # ax1.plot(
+    #     wind_speeds, Ct_PS_Mode_0, label="FLORIS+MITROTOR+ROSCO: PS_Mode = 0",
+    #     lw=3, linestyle = "dashed", zorder = 1,
+    # )
     ax1.plot(wind_speeds, Ct_PS_Mode_3, label="FLORIS+MITROTOR+ROSCO: PS_Mode = 3",
         lw=3, linestyle = "dotted", zorder = 1,
     )
@@ -224,10 +224,10 @@ def main():
         wind_speeds, Cp_abbas, label="Abbas et al. ROSCO Control",
         lw=3, linestyle = "solid", zorder = 1,
     )
-    ax2.plot(
-        wind_speeds, Cp_PS_Mode_0, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 0",
-        lw=3, linestyle = "dashed", zorder = 1,
-    )
+    # ax2.plot(
+    #     wind_speeds, Cp_PS_Mode_0, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 0",
+    #     lw=3, linestyle = "dashed", zorder = 1,
+    # )
     ax2.plot(wind_speeds, Cp_PS_Mode_3, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 3",
         lw=3, linestyle = "dotted", zorder = 1,
     )
@@ -245,10 +245,10 @@ def main():
         wind_speeds, P_abbas, label="Abbas et al. ROSCO Control",
         lw=3, linestyle = "solid", zorder = 1,
     )
-    ax3.plot(
-        wind_speeds, P_PS_Mode_0, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 0",
-        lw=3, linestyle = "dashed", zorder = 1,
-    )
+    # ax3.plot(
+    #     wind_speeds, P_PS_Mode_0, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 0",
+    #     lw=3, linestyle = "dashed", zorder = 1,
+    # )
     ax3.plot(wind_speeds, P_PS_Mode_3, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 3",
         lw=3, linestyle = "dotted", zorder = 1,
     )
