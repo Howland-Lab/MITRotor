@@ -22,6 +22,7 @@ from rosco.toolbox import control_interface as ROSCO_ci
 from rosco.toolbox import sim as ROSCO_sim
 from rosco.toolbox.utilities import write_rotor_performance, write_DISCON
 from rosco.toolbox.inputs.validation import load_rosco_yaml
+import time
 
 # -----------------------------
 # Create Ct/Cp surfaces
@@ -107,6 +108,10 @@ def load_from_mitrotor(
     turbine.Cp = ROSCO_turbine.RotorPerformance(turbine.Cp_table,turbine.pitch_initial_rad,turbine.TSR_initial, refine=refine_cp_surface)
     turbine.Ct = ROSCO_turbine.RotorPerformance(turbine.Ct_table,turbine.pitch_initial_rad,turbine.TSR_initial, refine=refine_cp_surface)
     turbine.Cq = ROSCO_turbine.RotorPerformance(turbine.Cq_table,turbine.pitch_initial_rad,turbine.TSR_initial, refine=refine_cp_surface)
+
+    if not turbine.TSR_operational: # TODO: make it clear that this is reccomeneded! 
+        turbine.TSR_operational = turbine.Cp.TSR_opt
+
     return turbine
 
 # -----------------------------
@@ -141,7 +146,7 @@ def get_rosco_control_interps(
 
     # Load and check control parameters
     controller_params = inps['controller_params']
-    if (controller_params["WE_Mode"] != 0) or (controller_params["WE_Mode"] != 2):
+    if (controller_params["WE_Mode"] != 0) and (controller_params["WE_Mode"] != 2):
         warnings.warn(
             "We suggest using WE_Mode = 0 or WE_Mode = 2 within the control parameter file.",
             UserWarning,
@@ -177,6 +182,7 @@ def get_rosco_control_interps(
 
     # Create parameter tables
     v_grid = controller.v.copy()
+    # v_grid = np.flip(v_grid)
     yaw_grid_deg = np.sort(np.asarray(yaw_grid_deg, dtype=float))
     yaw_grid_rad = np.deg2rad(yaw_grid_deg)
 
@@ -209,32 +215,32 @@ def get_rosco_control_interps(
 
     # Run parallel (fallback to serial on failure, e.g., pickling issue)
     print(
-        f"Starting control LUT sweep: {n_wind} wind-row tasks "
+        f"Starting control LUT sweep: {n_yaw} yaw tasks "
         f"({total_cases} wind-yaw cases), using {n_jobs_eff} worker process(es)."
     )
 
     def _run_serial(desc):
         out = []
-        for i, v in enumerate(tqdm(v_grid, total=n_wind, desc=desc, dynamic_ncols=True)):
+        for i, yaw_rad in enumerate(tqdm(yaw_grid_rad, total=n_wind, desc=desc, dynamic_ncols=True)):
             out.append(
                 _run_one_wind_row(
-                    i, v, yaw_grid_rad, init_pitch_list[i], init_tsr_list[i],
+                    i, v_grid, yaw_rad, init_pitch_list, init_tsr_list,
                     turbine_sim, bem, param_filename, dt, SimName
                 )
             )
         return out
 
-    rows = None
+    cols = None
     if n_jobs_eff > 1:
-        bar = tqdm(total=n_wind, desc="Control LUT sweep (wind rows)", dynamic_ncols=True)
+        bar = tqdm(total=n_yaw, desc="Control LUT sweep (wind cols)", dynamic_ncols=True)
         try:
             with tqdm_joblib(bar):
-                rows = Parallel(n_jobs=n_jobs_eff, backend="loky", verbose=0, batch_size=1)(
+                cols = Parallel(n_jobs=n_jobs_eff, backend="loky", verbose=0, batch_size=1)(
                     delayed(_run_one_wind_row)(
-                        i, v, yaw_grid_rad, init_pitch_list[i], init_tsr_list[i],
+                        i, v_grid, yaw_rad, init_pitch_list, init_tsr_list,
                         turbine_sim, bem, param_filename, dt, SimName
                     )
-                    for i, v in enumerate(v_grid)
+                    for i, yaw_rad in enumerate(yaw_grid_rad)
                 )
         except Exception as e:
             warnings.warn(
@@ -244,15 +250,15 @@ def get_rosco_control_interps(
             )
         finally:
             bar.close()
-    if rows is None:
+    if cols is None:
         desc = "Control LUT sweep (serial fallback)" if n_jobs_eff > 1 else "Control LUT sweep (serial)"
-        rows = _run_serial(desc)
+        cols = _run_serial(desc)
 
     # Collect setpoints
-    for i, pitch_row, tsr_row, power_row in rows:
-        pitch_tbl[i, :] = pitch_row
-        tsr_tbl[i, :]   = tsr_row
-        power_tbl[i, :] = power_row
+    for i, pitch_col, tsr_col, power_col in cols:
+        pitch_tbl[:, i] = pitch_col
+        tsr_tbl[:, i]   = tsr_col
+        power_tbl[:, i] = power_col
 
     # Optional CSV save
     if save_control_file is not None:
@@ -284,7 +290,7 @@ def get_rosco_control_interps(
     return pitch_interp, tsr_interp, turbine.rated_rotor_speed
 
 def _run_one_wind_row(
-    i, v, yaw_grid_rad, init_pitch_deg0, init_tsr0,
+    i, v_grid, yaw_rad, init_pitch_deg_list, init_tsr_list,
     turbine_sim, bem, param_filename, dt, SimName
 ):
     """
@@ -292,19 +298,21 @@ def _run_one_wind_row(
     Uses sequential warm-start across yaw in this row.
     Returns row arrays (pitch/tsr/power), with NaN on fail/non-convergence.
     """
-    ny = len(yaw_grid_rad)
-    pitch_row = np.full(ny, np.nan, dtype=float)
-    tsr_row   = np.full(ny, np.nan, dtype=float)
-    power_row = np.full(ny, np.nan, dtype=float)
+    nv = len(v_grid)
+    pitch_col = np.full(nv, np.nan, dtype=float)
+    tsr_col   = np.full(nv, np.nan, dtype=float)
+    power_col = np.full(nv, np.nan, dtype=float)
 
     # Warm-start seeds for first yaw in this wind row
-    prev_pitch_deg = float(init_pitch_deg0)
-    prev_tsr = float(init_tsr0)
+    # prev_pitch_deg = float(init_pitch_deg0)
+    # prev_tsr = float(init_tsr0)
 
-    for j, yaw_rad in enumerate(yaw_grid_rad):
+    for j, v in enumerate(v_grid):
         controller_int = None
         try:
-            init_omega = prev_tsr * v / turbine_sim.rotor_radius
+            init_pitch_deg = init_pitch_deg_list[j]
+            init_tsr = init_tsr_list[j]
+            init_omega = init_tsr * v / turbine_sim.rotor_radius
             init_gen   = init_omega * turbine_sim.Ng
 
             controller_int = WarmStartControllerInterface(
@@ -315,7 +323,7 @@ def _run_one_wind_row(
                 init_ws=v,
                 init_rot_speed=init_omega,
                 init_gen_speed=init_gen,
-                init_pitch_deg=prev_pitch_deg,   # deg
+                init_pitch_deg=init_pitch_deg,   # deg
                 init_torque=0.0,
                 init_nac_imu=yaw_rad,            # rad
             )
@@ -325,8 +333,8 @@ def _run_one_wind_row(
 
             converged = sim_ws_mitrotor(
                 sim=sim, bem=bem, ws=v, dt=dt,
-                init_tsr=prev_tsr,
-                init_pitch=prev_pitch_deg,   # deg
+                init_tsr=init_tsr,
+                init_pitch=init_pitch_deg,   # deg
                 yaw_init=yaw_rad,            # rad
                 wd=0.0,
                 verbose=False,
@@ -334,13 +342,9 @@ def _run_one_wind_row(
 
             # Save only converged points; else remain NaN
             if converged:
-                pitch_row[j] = sim.bld_pitch   # rad
-                tsr_row[j]   = sim.tsr
-                power_row[j] = sim.gen_power
-
-                # update warm-start for next yaw
-                prev_pitch_deg = np.rad2deg(sim.bld_pitch)
-                prev_tsr = sim.tsr
+                pitch_col[j] = sim.bld_pitch   # rad
+                tsr_col[j]   = sim.tsr
+                power_col[j] = sim.gen_power
 
         except Exception:
             # leave NaN and continue to next yaw
@@ -351,7 +355,7 @@ def _run_one_wind_row(
                     pass
             continue
 
-    return i, pitch_row, tsr_row, power_row
+    return i, pitch_col, tsr_col, power_col
 
 
 def load_control_interps_from_csv(csv_path):
@@ -371,7 +375,7 @@ def load_control_interps_from_csv(csv_path):
     v_grid = np.unique(ws)
     yaw_grid = np.unique(yaw)
 
-    # sort rows by (ws, yaw), then reshape into [n_ws, n_yaw]
+    # sort cols by (ws, yaw), then reshape into [n_ws, n_yaw]
     order = np.lexsort((yaw, ws))
     n_ws, n_yaw = len(v_grid), len(yaw_grid)
 
@@ -481,18 +485,22 @@ def sim_ws_mitrotor(
     converged = False
     last_metrics = None
     # Begin iteration
+    t = 0.0
     while n_iter < max_iter:
         t += dt
 
-        tsr = rot_speed * R / max(ws, 1e-6)
+        tsr = rot_speed * R / max(ws, 1e-6) 
         yaw_err = wd - nac_yaw
 
         # BEM call
+        start = time.time()
         sol = bem(
             bld_pitch, tsr,
             yaw = yaw_err,
-            tilt = 0.0
+            tilt = 0.0 # TODO: add in tilt
         )
+        end = time.time()
+        t += (end - start)
         cp = float(np.ravel(sol.Cp())[0])
 
         # Rotor dynamics calculations (same as used in ROSCO's sim_ws_series function)
@@ -553,7 +561,7 @@ def sim_ws_mitrotor(
 
     # Save outputs
     sim.bld_pitch = bld_pitch               # rad
-    sim.tsr = rot_speed * R / max(ws, 1e-6)
+    sim.tsr = rot_speed * R / max(ws, 1e-6) # TSR w.r.t. freestream
     sim.rot_speed = rot_speed               # rad/s
     sim.gen_speed = gen_speed               # rad/s
     sim.gen_torque = gen_torque             # Nm
@@ -561,6 +569,8 @@ def sim_ws_mitrotor(
     sim.nac_yaw = nac_yaw                   # rad
     sim.n_iter = n_iter
     sim.converged = converged
+
+    print(ws, yaw_init, sim.bld_pitch, sim.tsr, t / n_iter)
 
     return converged
 
@@ -763,7 +773,7 @@ class ConvergenceSettings:
     window_time: float = 20.0
     hold_time: float = 5.0
     tol_rel_power_std: float = 1e-3
-    tol_domega_dt: float = 1e-4
+    tol_domega_dt: float = 1e-3
     tol_dpitch_dt: float = np.deg2rad(1e-3)
 
 
