@@ -3,15 +3,7 @@ import numpy as np
 import polars as pl
 from pathlib import Path
 import time
-import warnings
-
-warnings.filterwarnings("ignore", category=RuntimeWarning) # JUST FOR NOW
-
-
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.colors import Normalize
-from matplotlib.cm import ScalarMappable
 
 # Floris imports
 from floris import FlorisModel, TimeSeries
@@ -23,6 +15,9 @@ from MITRotor.Momentum import UnifiedMomentum, UnifiedMomentumLUT
 from MITRotor.Geometry import BEMGeometry
 from MITRotor.TipLoss import NoTipLoss
 from MITRotor.BEMSolver import BEM
+
+# Example shows that MITRotor rotor values are equivalent to FLORIS rotor values when MITRotor is
+# set as the rotor model using the `set_operation_model` function.
 
 figdir = Path("fig")
 floris_air_density = 1.225
