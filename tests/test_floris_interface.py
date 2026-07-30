@@ -17,13 +17,14 @@ def test_pitch_tsr_interpolation():
     validation_csv = os.path.abspath(os.path.join(module_dir, "..", "MITRotor", "FlorisInterface", "IEA_15mw_rotor.csv"))
     df = pl.read_csv(validation_csv)
     wind_data = df["Wind [m/s]"].to_numpy()
-    pitch_data = df["Pitch [deg]"].to_numpy()
+    pitch_deg_data = df["Pitch [deg]"].to_numpy()
+    pitch_rad_data = np.deg2rad(pitch_deg_data)
     tip_speed_data = df["Tip Speed [m/s]"].to_numpy()
     tsr_data = tip_speed_data / wind_data
 
     # interpolator reproduces raw data
     assert_allclose(tsr_interp(wind_data), tsr_data, rtol=1e-12, atol=1e-12)
-    assert_allclose(pitch_interp(wind_data), pitch_data, rtol=1e-12, atol=1e-12)
+    assert_allclose(pitch_interp(wind_data), pitch_rad_data, rtol=1e-12, atol=1e-12)
 
     # reasonable values
     x_interp_vals = np.linspace(0.0, 25.0, 100)
@@ -46,9 +47,9 @@ def compute_mitrotor_cp_ct_a(wind_speeds, yaw_deg = 0.0, tilt_deg = 0.0):
     Ct = np.empty(n)
     a = np.empty(n) 
     for i, ws in enumerate(wind_speeds):
-        pitch = np.deg2rad(pitch_interp(ws))
+        pitch_rad = pitch_interp(ws)
         tsr = tsr_interp(ws)
-        sol = bem_model(pitch, tsr, yaw=np.deg2rad(yaw_deg), tilt = np.deg2rad(tilt_deg))
+        sol = bem_model(pitch_rad, tsr, yaw=np.deg2rad(yaw_deg), tilt = np.deg2rad(tilt_deg))
         Ct[i] = sol.Ct()
         a[i] = sol.a()
 

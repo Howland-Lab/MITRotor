@@ -47,6 +47,11 @@ class MomentumModel(ABC):
     def compute_initial_wake_velocities(self, Ct: float, yaw: float = 0, tilt: float = 0.0) -> ArrayLike:
         ...
 
+    def compute_initial_wake_velocities_and_x0(
+        self, Ct: float, yaw: float = 0, tilt: float = 0.0
+    ) -> ArrayLike:
+        return (*self.compute_initial_wake_velocities(Ct, yaw, tilt), None)
+
     
     def _func_rotor(
         self,
@@ -160,8 +165,6 @@ class ClassicalMomentum(MomentumModel):
         v4 = - (1/4) * Ct * np.sin(yaw)
         w4 = 0.0
         return u4, v4, w4
-
-
 
 class MadsenMomentum(MomentumModel):
     """
