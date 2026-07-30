@@ -164,7 +164,7 @@ class MITRotorTurbine(BaseOperationModel):
                 self._a[:, tindex] = bem_sol.a()
                 self._Ct[:, tindex] = bem_sol.Ct()
                 # get near wake velocities
-                self._u4 = bem_sol.u4,
+                self._u4 = bem_sol.u4
                 self._v4 = bem_sol.v4
                 self._w4 = bem_sol.w4 
                 self._x0 = bem_sol.x0 
