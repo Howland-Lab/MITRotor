@@ -285,7 +285,7 @@ class UnifiedMomentum(MomentumModel):
 
         self.model_Ct = (
             model_Ct if model_Ct is not None
-            else UMM.ThrustBasedUnified(beta=beta)
+            else UMM.ThrustBasedUnified(beta_s=beta)
         )
 
     def compute_induction(self, Cx: ArrayLike, yaw: float = 0.0, tilt: float = 0.0) -> ArrayLike:
@@ -300,7 +300,7 @@ class UnifiedMomentum(MomentumModel):
 # Look-up table for unified model
 def func_Ct(x, beta, cached) -> dict:
     Ct, eff_yaw = x
-    model_Ct = UMM.ThrustBasedUnified(beta = beta, cached=cached)
+    model_Ct = UMM.ThrustBasedUnified(beta_s = beta, cached=cached)
     sol = model_Ct(Ct, np.deg2rad(np.round(eff_yaw, 2)))
     return dict(
         Ct=Ct,
