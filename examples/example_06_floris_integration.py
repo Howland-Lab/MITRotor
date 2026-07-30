@@ -129,20 +129,6 @@ mit_Ct_annulus_umm = mit_sols_annulus_umm.Ct()
 mit_Cp_annulus_umm = mit_sols_annulus_umm.Cp()
 print("MITRotor UMM-BEM Annulus-Averaged: " + str(mit_annulus_umm_end - mit_annulus_umm_start) + " seconds")
 
-# solve UMM-BEM though MITRotor - sector averaged
-# bem_sector_umm = BEM(
-#         rotor=IEA15MW(),
-#         momentum_model=UnifiedMomentum(averaging="sector"),
-#         geometry=BEMGeometry(Nr=10, Ntheta=20),
-#         tiploss_model=NoTipLoss(),
-#     )
-# mit_sector_umm_start = time.time()
-# mit_sols_sector_umm = bem_sector_umm(pitch=pitches, tsr=tsrs, yaw=yaws, tilt=tilts)
-# mit_sector_umm_end = time.time()
-# mit_Ct_sector_umm = mit_sols_sector_umm.Ct()
-# mit_Cp_sector_umm = mit_sols_sector_umm.Cp()
-# print("MITRotor UMM-BEM Sector-Averaged: " + str(mit_sector_umm_end - mit_sector_umm_start) + " seconds")
-
 # solve UMM-BEM with LUT though MITRotor - annulus averaged
 print("Making LUT!")
 bem_annulus_umm_LUT = BEM(
@@ -164,16 +150,19 @@ time_series = TimeSeries(
     wind_directions=wind_dirs,
     turbulence_intensities=turbulence_intensity,
 )
+floris_rotor_model = MITRotorTurbine()
+rotor_area = np.pi * bem_rotor_umm.rotor.R**2 
+cp_calc_denominator = (0.5 * floris_air_density * rotor_area * (wind_speeds)**3 * floris_rotor_model.eff_ratio)
+
 fmodel_rotor_umm = FlorisModel("defaults")
 fmodel_rotor_umm.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series)
-fmodel_rotor_umm.set_operation_model(MITRotorTurbine()) # default bem_model uses rotor-averaging
+fmodel_rotor_umm.set_operation_model(floris_rotor_model) # default bem_model uses rotor-averaging
 floris_rotor_umm_start = time.time()
 fmodel_rotor_umm.run()
 floris_rotor_umm_end = time.time()
 floris_Ct_rotor_umm = fmodel_rotor_umm.get_turbine_thrust_coefficients()
-rotor_area = np.pi * bem_rotor_umm.rotor.R**2 
 floris_power_rotor_umm = np.squeeze(fmodel_rotor_umm.get_turbine_powers())
-floris_Cp_rotor_umm =  floris_power_rotor_umm / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
+floris_Cp_rotor_umm =  floris_power_rotor_umm / cp_calc_denominator
 print("FLORIS UMM-BEM Rotor-Averaged: " + str(floris_rotor_umm_end - floris_rotor_umm_start) + " seconds")
 
 # solve FLORIS  with UMM-BEM though MITRotor - annulus averaged
@@ -185,7 +174,7 @@ fmodel_annulus_umm.run()
 floris_annulus_umm_end = time.time()
 floris_Ct_annulus_umm = fmodel_annulus_umm.get_turbine_thrust_coefficients()
 floris_power_annulus_umm = np.squeeze(fmodel_annulus_umm.get_turbine_powers())
-floris_Cp_annulus_umm =  floris_power_annulus_umm / (0.5 * 1.225 * rotor_area * (wind_speeds)**3) # TODO: account for eff_ratio
+floris_Cp_annulus_umm =  floris_power_annulus_umm / cp_calc_denominator
 print("FLORIS UMM-BEM Annulus-Averaged: " + str(floris_annulus_umm_end - floris_annulus_umm_start) + " seconds")
 
 # solve FLORIS  with UMM-BEM with LUT though MITRotor - annulus averaged
@@ -197,7 +186,7 @@ fmodel_annulus_umm_LUT.run()
 floris_annulus_umm_LUT_end = time.time()
 floris_Ct_annulus_umm_LUT = fmodel_annulus_umm_LUT.get_turbine_thrust_coefficients()
 floris_power_annulus_umm_LUT = np.squeeze(fmodel_annulus_umm_LUT.get_turbine_powers())
-floris_Cp_annulus_umm_LUT =  floris_power_annulus_umm_LUT / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
+floris_Cp_annulus_umm_LUT =  floris_power_annulus_umm_LUT / cp_calc_denominator
 print("FLORIS UMM-BEM LUT Annulus-Averaged: " + str(floris_annulus_umm_LUT_end - floris_annulus_umm_LUT_start) + " seconds")
 
 # Presentation-friendly typography

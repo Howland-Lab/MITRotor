@@ -35,8 +35,7 @@ def default_pitch_interp():
     pitch_file = os.path.join(module_dir, "IEA_15mw_rotor.csv")
     df = pl.read_csv(pitch_file)
     wind_table = df["Wind [m/s]"].to_numpy()
-    pitch_table = np.deg2rad(df["Pitch [deg]"])
-    # TODO: should fill_value be extrapolate?
+    pitch_table = np.deg2rad(df["Pitch [deg]"]) # interpolator takes in radians!
     return interp1d(wind_table, pitch_table, kind="linear", fill_value="extrapolate", bounds_error=False)
 
 # default 1D tsr vs windspeed interpolater if none provided by user
@@ -48,7 +47,6 @@ def default_tsr_interp():
     wind_table = df["Wind [m/s]"].to_numpy()
     tip_speed_table = df["Tip Speed [m/s]"].to_numpy()
     tsr_table = tip_speed_table / wind_table
-    # TODO: should fill_value be extrapolate?
     return interp1d(wind_table, tsr_table, kind="linear", fill_value="extrapolate", bounds_error=False)
 
 @define
@@ -79,7 +77,7 @@ class MITRotorTurbine(BaseOperationModel):
 
     # create interp objects based on pitch and tsr csvs
     pitch_interp = field(init = True, factory = default_pitch_interp, type = Optional[InterpLike], repr = False)
-    pitch_rad = field(init = True, default = True, type = bool)
+    pitch_rad = field(init = True, default = True, type = bool)  # set if interpolater takes in radians (True) or degrees (False)
     tsr_interp   = field(init = True, factory = default_tsr_interp, type = Optional[InterpLike], repr=False)
     rated_rotor_speed = field(init = True, default = None, type = Optional[float])  # [rad/s]
 
@@ -110,11 +108,10 @@ class MITRotorTurbine(BaseOperationModel):
     def _update_solution(self,
         velocities: NDArrayFloat,
         air_density: float,
-        yaw_angles: NDArrayFloat,
-        tilt_angles: NDArrayFloat,
+        yaw_angles: NDArrayFloat,  # input in degrees
+        tilt_angles: NDArrayFloat, # input in degrees
         average_method: str = "cubic-mean",
         cubature_weights: Optional[NDArrayFloat] = None,
-        power_thrust_table: Optional[dict] = None,
         **_,
     ):
         # create cache key for current inputs
@@ -153,7 +150,7 @@ class MITRotorTurbine(BaseOperationModel):
                 self.tsr_interp, rotor_average_velocities, eff_yaw, kind = "tsr",
                 rated_rotor_speed = self.rated_rotor_speed, rotor_radius = self.bem_model.rotor.R,
             )
-            if not self.pitch_rad:
+            if not self.pitch_rad: # make sure input to MITRotor BEM in in radians
                 pitch = np.deg2rad(pitch)
 
             # solve BEM for setpoints from control curves
