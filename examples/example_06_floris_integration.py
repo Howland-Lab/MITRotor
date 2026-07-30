@@ -185,7 +185,7 @@ fmodel_annulus_umm.run()
 floris_annulus_umm_end = time.time()
 floris_Ct_annulus_umm = fmodel_annulus_umm.get_turbine_thrust_coefficients()
 floris_power_annulus_umm = np.squeeze(fmodel_annulus_umm.get_turbine_powers())
-floris_Cp_annulus_umm =  floris_power_annulus_umm / (0.5 * 1.225 * rotor_area * (wind_speeds)**3)
+floris_Cp_annulus_umm =  floris_power_annulus_umm / (0.5 * 1.225 * rotor_area * (wind_speeds)**3) # TODO: account for eff_ratio
 print("FLORIS UMM-BEM Annulus-Averaged: " + str(floris_annulus_umm_end - floris_annulus_umm_start) + " seconds")
 
 # solve FLORIS  with UMM-BEM with LUT though MITRotor - annulus averaged
