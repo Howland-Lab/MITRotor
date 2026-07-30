@@ -292,6 +292,11 @@ class UnifiedMomentum(MomentumModel):
         sol = self.model_Ct(Cx, yaw = yaw, tilt = tilt)
         return sol.u4, sol.v4, sol.w4
 
+    def compute_initial_wake_velocities_and_x0(self, Cx: ArrayLike, yaw: float = 0.0, tilt: float = 0.0) -> ArrayLike:
+        sol = self.model_Ct(Cx, yaw = yaw, tilt = tilt)
+        return sol.u4, sol.v4, sol.w4, sol.x0
+
+
 
 # Look-up table for unified model
 def func_Ct(x, beta, cached) -> dict:

@@ -46,6 +46,7 @@ class BEMSolution:
     v4: float
     tilt: float = 0.0
     w4: float = 0
+    x0: float = 0
 
     def a(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.an, grid)
@@ -246,7 +247,7 @@ class BEM:
         aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir, tilt = tilt)
         aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt)
         avg_Ct = average(self.geometry, aero_props.C_x)
-        u4,v4,w4 = self.momentum_model.compute_initial_wake_velocities(avg_Ct, yaw, tilt = tilt)
+        u4,v4,w4,x0 = self.momentum_model.compute_initial_wake_velocities_and_x0(avg_Ct, yaw, tilt = tilt)
 
         if self.scalar_inputs: # if all setpoints were scalars
             # return single values as scalars
@@ -261,4 +262,4 @@ class BEM:
                 if isinstance(value, np.ndarray):
                     setattr(aero_props, key, np.squeeze(value))
 
-        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4, tilt = tilt, w4 = w4)
+        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4, tilt = tilt, w4 = w4, x0 = x0)
