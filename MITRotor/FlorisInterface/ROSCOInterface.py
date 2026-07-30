@@ -348,6 +348,7 @@ def _run_one_wind_row(
 
         except Exception:
             # leave NaN and continue to next yaw
+            print("HELLO")
             if controller_int is not None:
                 try:
                     controller_int.kill_discon()
