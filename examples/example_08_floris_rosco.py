@@ -13,23 +13,12 @@ import time
 # FLORIS modules
 from floris import FlorisModel, TimeSeries
 
-# ROSCO toolbox modules 
-from rosco.toolbox import controller as ROSCO_controller
-from rosco.toolbox import turbine as ROSCO_turbine
-from rosco.toolbox.inputs.validation import load_rosco_yaml
-
 # MITRotor modules
 from MITRotor.Momentum import UnifiedMomentumLUT
 from MITRotor import BEM, BEMGeometry, IEA15MW
-from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, default_bem_factory, default_pitch_interp, default_tsr_interp
+from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine
 from MITRotor.FlorisInterface.ROSCOInterface import get_rosco_control_interps
 from MITRotor.FlorisInterface.InterfaceUtilities import query_controls
-
-
-# THIS RUN HAD:
-#   VS_ControlMode:     2 
-#   WE_Mode:            0   
-
 
 figdir = Path("fig")
 
@@ -94,36 +83,36 @@ def main():
 
     # Load IEA15MW ROSCO parameters to make controllers
     start = time.time()
-    rosco_yaml_PS_Mode_3 = "MITRotor/ReferenceTurbines/ROSCO_IEA15MW.yaml"
+    rosco_yaml_VS_1 = "MITRotor/ReferenceTurbines/ROSCO_IEA15MW.yaml"
     # takes ~25min with 8 workers
-    rosco_PS_Mode_3_pitch_interp, rosco_PS_Mode_3_tsr_interp, rosco_PS_Mode_3_rated_rotorspeed = get_rosco_control_interps(
-        rosco_yaml_PS_Mode_3, bem,
-        regenerate = False, save_control_file = "control_ps_3.csv")
-        # regenerate = True, save_control_file = "control_ps_3.csv")
+    rosco_VS_1_pitch_interp, rosco_VS_1_tsr_interp, rosco_VS_1_rated_rotorspeed = get_rosco_control_interps(
+        rosco_yaml_VS_1, bem,
+        # regenerate = False, save_control_file = "control_vs_1.csv")
+        regenerate = True, save_control_file = "control_vs_1.csv")
     end = time.time()
     print(f"Time to make control CSV: {end - start}")
-
-    rosco_PS_Mode_0_pitch_interp, rosco_PS_Mode_0_tsr_interp, rosco_PS_Mode_0_rated_rotorspeed = change_control_param(
-        "PS_Mode", 0, rosco_yaml_PS_Mode_3, bem,
-        # regenerate = True, save_control_file = "control_ps_0.csv",
-        regenerate = False, save_control_file = "control_ps_0.csv"
+    # takes ~25min with 8 workers
+    rosco_VS_3_pitch_interp, rosco_VS_3_tsr_interp, rosco_VS_3_rated_rotorspeed = change_control_param(
+        "VS_ControlMode", 3, rosco_yaml_VS_1, bem,
+        regenerate = True, save_control_file = "control_vs_3.csv",
+        # regenerate = False, save_control_file = "control_vs_3.csv"
     )
         
-    # Plot IEA15MW control from ROSCO paper, ROSOC control with PS_Mode = 3, and ROSOC control with PS_Mode = 0
+    # Plot IEA15MW control from ROSCO paper, ROSOC control with VS_Control_Mode = 1, and ROSOC control withVS_Control_Mode = 3
     pitch_abbas = abbas_pitch_interp(wind_speeds)
-    pitch_ps0 = np.rad2deg(query_controls(rosco_PS_Mode_0_pitch_interp, wind_speeds, 0.0))
-    pitch_ps3 = np.rad2deg(query_controls(rosco_PS_Mode_3_pitch_interp, wind_speeds, 0.0))
+    pitch_ps0 = np.rad2deg(query_controls(rosco_VS_3_pitch_interp, wind_speeds, 0.0))
+    pitch_ps3 = np.rad2deg(query_controls(rosco_VS_1_pitch_interp, wind_speeds, 0.0))
 
     tsr_abbas = abbas_tsr_interp(wind_speeds)
-    tsr_ps0 = query_controls(rosco_PS_Mode_0_tsr_interp, wind_speeds, 0.0)
-    tsr_ps3 = query_controls(rosco_PS_Mode_3_tsr_interp, wind_speeds, 0.0)
+    tsr_ps0 = query_controls(rosco_VS_3_tsr_interp, wind_speeds, 0.0)
+    tsr_ps3 = query_controls(rosco_VS_1_tsr_interp, wind_speeds, 0.0)
 
     # Create figure
     fig, ax = plt.subplots(1, 2, figsize = (10,4), sharey = True, constrained_layout=True)
     fig.suptitle(fr"Setpoint Trajectories")
     # Plot pitch
-    ax[0].plot(wind_speeds, pitch_ps0, label="ROSCO: PS_Mode = 0", lw=3)
-    ax[0].plot(wind_speeds, pitch_ps3, label="ROSCO: PS_Mode = 3", lw=3, linestyle = "dashed")
+    ax[0].plot(wind_speeds, pitch_ps0, label="ROSCO:VS_Control_Mode = 3", lw=3)
+    ax[0].plot(wind_speeds, pitch_ps3, label="ROSCO: VS_Control_Mode = 1", lw=3, linestyle = "dashed")
     ax[0].plot(wind_speeds, pitch_abbas, label="Abbas et al. Fig 2", lw=3, linestyle = "dotted")
 
     ax[0].set_xlabel("Wind Speed [m/s]")
@@ -132,8 +121,8 @@ def main():
     ax[0].grid(True)
 
     # Plot TSR
-    ax[1].plot(wind_speeds, tsr_ps0, label="MITRotor+FLORIS+ROSCO: PS_Mode = 0", lw=3)
-    ax[1].plot(wind_speeds, tsr_ps3, label="MITRotor+FLORIS+ROSCO: PS_Mode = 3", lw=3, linestyle = "dashed")
+    ax[1].plot(wind_speeds, tsr_ps0, label="MITRotor+FLORIS+ROSCO:VS_Control_Mode = 3", lw=3)
+    ax[1].plot(wind_speeds, tsr_ps3, label="MITRotor+FLORIS+ROSCO: VS_Control_Mode = 1", lw=3, linestyle = "dashed")
     ax[1].plot(wind_speeds, tsr_abbas, label="Abbas et al. ROSCO Control", lw=3, linestyle = "dotted")
 
     ax[1].set_xlabel("Wind Speed [m/s]")
@@ -156,20 +145,20 @@ def main():
         tsr_interp = abbas_tsr_interp,
     )
 
-    floris_PS_Mode_0_turbine = MITRotorTurbine(
+    floris_VS_3_turbine = MITRotorTurbine(
         bem_model = bem,
-        pitch_interp = rosco_PS_Mode_0_pitch_interp,
+        pitch_interp = rosco_VS_3_pitch_interp,
         pitch_rad = True,
-        tsr_interp = rosco_PS_Mode_0_tsr_interp,
-        rated_rotor_speed = rosco_PS_Mode_0_rated_rotorspeed,
+        tsr_interp = rosco_VS_3_tsr_interp,
+        rated_rotor_speed = rosco_VS_3_rated_rotorspeed,
     )
 
-    floris_PS_Mode_3_turbine = MITRotorTurbine(
+    floris_VS_1_turbine = MITRotorTurbine(
         bem_model = bem,
-        pitch_interp = rosco_PS_Mode_3_pitch_interp,
+        pitch_interp = rosco_VS_1_pitch_interp,
         pitch_rad = True,
-        tsr_interp = rosco_PS_Mode_3_tsr_interp,
-        rated_rotor_speed = rosco_PS_Mode_3_rated_rotorspeed,
+        tsr_interp = rosco_VS_1_tsr_interp,
+        rated_rotor_speed = rosco_VS_1_rated_rotorspeed,
     )
     yaw = 0.0 # degrees
     yaw_angles = [[yaw] for _ in np.arange(len(wind_speeds))]
@@ -187,19 +176,19 @@ def main():
     Ct_abbas = fmodel_abbas.get_turbine_thrust_coefficients()
     Cp_abbas, P_abbas = get_turbine_power_coefficent(floris_abbas_turbine, fmodel_abbas, wind_speeds)
 
-    fmodel_PS_Mode_0 = FlorisModel("defaults")
-    fmodel_PS_Mode_0.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
-    fmodel_PS_Mode_0.set_operation_model(floris_PS_Mode_0_turbine)
-    fmodel_PS_Mode_0.run()
-    Ct_PS_Mode_0 = fmodel_PS_Mode_0.get_turbine_thrust_coefficients()
-    Cp_PS_Mode_0, P_PS_Mode_0 = get_turbine_power_coefficent(floris_PS_Mode_0_turbine, fmodel_PS_Mode_0, wind_speeds)
+    fmodel_VS_3 = FlorisModel("defaults")
+    fmodel_VS_3.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
+    fmodel_VS_3.set_operation_model(floris_VS_3_turbine)
+    fmodel_VS_3.run()
+    Ct_VS_3 = fmodel_VS_3.get_turbine_thrust_coefficients()
+    Cp_VS_3, P_VS_3 = get_turbine_power_coefficent(floris_VS_3_turbine, fmodel_VS_3, wind_speeds)
 
-    fmodel_PS_Mode_3 = FlorisModel("defaults")
-    fmodel_PS_Mode_3.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
-    fmodel_PS_Mode_3.set_operation_model(floris_PS_Mode_3_turbine)
-    fmodel_PS_Mode_3.run() 
-    Ct_PS_Mode_3 = fmodel_PS_Mode_3.get_turbine_thrust_coefficients()
-    Cp_PS_Mode_3, P_PS_Mode_3 = get_turbine_power_coefficent(floris_PS_Mode_3_turbine, fmodel_PS_Mode_3, wind_speeds)
+    fmodel_VS_1 = FlorisModel("defaults")
+    fmodel_VS_1.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
+    fmodel_VS_1.set_operation_model(floris_VS_1_turbine)
+    fmodel_VS_1.run() 
+    Ct_VS_1 = fmodel_VS_1.get_turbine_thrust_coefficients()
+    Cp_VS_1, P_VS_1 = get_turbine_power_coefficent(floris_VS_1_turbine, fmodel_VS_1, wind_speeds)
 
     # plot CT values against one another and against IEA15MW from figure 3.1-C (https://docs.nlr.gov/docs/fy20osti/75698.pdf)
     fig, (ax1, ax2, ax3) = plt.subplots(ncols = 3, sharey = False, figsize = (16,4), constrained_layout=True)
@@ -213,10 +202,10 @@ def main():
         lw=3, linestyle = "solid", zorder = 1,
     )
     ax1.plot(
-        wind_speeds, Ct_PS_Mode_0, label="FLORIS+MITROTOR+ROSCO: PS_Mode = 0",
+        wind_speeds, Ct_VS_3, label="FLORIS+MITROTOR+ROSCO:VS_Control_Mode = 3",
         lw=3, linestyle = "dashed", zorder = 1,
     )
-    ax1.plot(wind_speeds, Ct_PS_Mode_3, label="FLORIS+MITROTOR+ROSCO: PS_Mode = 3",
+    ax1.plot(wind_speeds, Ct_VS_1, label="FLORIS+MITROTOR+ROSCO: VS_Control_Mode = 1",
         lw=3, linestyle = "dotted", zorder = 1,
     )
     ax1.set_xlabel("Wind Speed [m/s]")
@@ -233,10 +222,10 @@ def main():
         lw=3, linestyle = "solid", zorder = 1,
     )
     ax2.plot(
-        wind_speeds, Cp_PS_Mode_0, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 0",
+        wind_speeds, Cp_VS_3, label="FLORIS + MITROTOR + ROSCO:VS_Control_Mode = 3",
         lw=3, linestyle = "dashed", zorder = 1,
     )
-    ax2.plot(wind_speeds, Cp_PS_Mode_3, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 3",
+    ax2.plot(wind_speeds, Cp_VS_1, label="FLORIS + MITROTOR + ROSCO: VS_Control_Mode = 1",
         lw=3, linestyle = "dotted", zorder = 1,
     )
     ax2.set_xlabel("Wind Speed [m/s]")
@@ -253,10 +242,10 @@ def main():
         lw=3, linestyle = "solid", zorder = 1,
     )
     ax3.plot(
-        wind_speeds, P_PS_Mode_0, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 0",
+        wind_speeds, P_VS_3, label="FLORIS + MITROTOR + ROSCO:VS_Control_Mode = 3",
         lw=3, linestyle = "dashed", zorder = 1,
     )
-    ax3.plot(wind_speeds, P_PS_Mode_3, label="FLORIS + MITROTOR + ROSCO: PS_Mode = 3",
+    ax3.plot(wind_speeds, P_VS_1, label="FLORIS + MITROTOR + ROSCO: VS_Control_Mode = 1",
         lw=3, linestyle = "dotted", zorder = 1,
     )
     ax3.axhline(y = 15, lw=3, linestyle = "dotted", zorder = 0, color = "k", label = "15MW")
@@ -271,15 +260,15 @@ def main():
     # plot the difference in CT/CP curves for different yaw values
     yaw_list = [0.0, 10.0, 20.0] # degrees
     fig, (ax1, ax2, ax3) = plt.subplots(ncols = 3, sharey = False, figsize = (10,4), constrained_layout=True)
-    fig.suptitle(fr"$C_T$ and $C_P$ under Yaw for FLORIS + MITROTOR + ROSCO: PS_Mode = 3")
+    fig.suptitle(fr"$C_T$ and $C_P$ under Yaw for FLORIS + MITROTOR + ROSCO: VS_Control_Mode = 1")
     for (i, yaw) in enumerate(yaw_list):
         yaw_angles = [[yaw] for _ in np.arange(len(wind_speeds))]
-        fmodel_PS_Mode_3 = FlorisModel("defaults")
-        fmodel_PS_Mode_3.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
-        fmodel_PS_Mode_3.set_operation_model(floris_PS_Mode_3_turbine)
-        fmodel_PS_Mode_3.run() 
-        ct = fmodel_PS_Mode_3.get_turbine_thrust_coefficients()
-        cp, p = get_turbine_power_coefficent(floris_PS_Mode_3_turbine, fmodel_PS_Mode_3, wind_speeds)
+        fmodel_VS_1 = FlorisModel("defaults")
+        fmodel_VS_1.set(layout_x = [0.0], layout_y = [0.0], wind_data = time_series, yaw_angles = yaw_angles)
+        fmodel_VS_1.set_operation_model(floris_VS_1_turbine)
+        fmodel_VS_1.run() 
+        ct = fmodel_VS_1.get_turbine_thrust_coefficients()
+        cp, p = get_turbine_power_coefficent(floris_VS_1_turbine, fmodel_VS_1, wind_speeds)
 
         ax1.plot(wind_speeds, ct, label=fr"Yaw = ${yaw}^\circ$",
             lw=3, linestyle = "solid", zorder = 1,

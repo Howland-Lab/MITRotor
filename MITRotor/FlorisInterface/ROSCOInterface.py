@@ -264,41 +264,42 @@ def _run_one_yaw_row(
     Uses sequential warm-start across yaw in this row.
     Returns row arrays (pitch/tsr/power), with NaN on fail/non-convergence.
     """
+    print(f"Starting ROSCO simulation for yaw = {yaw_rad}")
     nv = len(v_grid)
     pitch_col = np.full(nv, np.nan, dtype=float)
     tsr_col   = np.full(nv, np.nan, dtype=float)
-    power_col = np.full(nv, np.nan, dtype=float)
+    power_col = np.full(nv, np.nan, dtype=float)\
+
+    j = 0
+    init_pitch_rad = init_pitch_rad_list[j]
+    init_pitch_deg = np.rad2deg(init_pitch_rad)
+    init_tsr = init_tsr_list[j]
+    init_rot_speed = init_tsr * v_grid[j] / turbine_sim.rotor_radius
+    init_gen_speed   = init_rot_speed * turbine_sim.Ng
+
+    controller_int = iu.WarmStartControllerInterface(
+        lib_name,
+        param_filename=param_filename,
+        sim_name=f"{SimName}_{i}_{j}",
+        DT=dt,
+        init_ws=v_grid[j],
+        init_rot_speed=init_rot_speed,
+        init_gen_speed=init_gen_speed,
+        init_pitch_deg=init_pitch_deg,   # deg
+        init_torque=0.0,
+        init_nac_imu=yaw_rad,            # rad
+    )
+
+    # lightweight sim object compatible with sim_ws_mitrotor
+    sim = SimpleNamespace(turbine=turbine_sim, controller_int=controller_int)
 
     for j, v in enumerate(v_grid):
-        print(v, yaw_rad)
         controller_int = None
         try:
-            init_pitch_rad = init_pitch_rad_list[j]
-            init_pitch_deg = np.rad2deg(init_pitch_rad)
-            init_tsr = init_tsr_list[j]
-            init_omega = init_tsr * v / turbine_sim.rotor_radius
-            init_gen   = init_omega * turbine_sim.Ng
-
-            controller_int = iu.WarmStartControllerInterface(
-                lib_name,
-                param_filename=param_filename,
-                sim_name=f"{SimName}_{i}_{j}",
-                DT=dt,
-                init_ws=v,
-                init_rot_speed=init_omega,
-                init_gen_speed=init_gen,
-                init_pitch_deg=init_pitch_deg,   # deg
-                init_torque=0.0,
-                init_nac_imu=yaw_rad,            # rad
-            )
-
-            # lightweight sim object compatible with sim_ws_mitrotor
-            sim = SimpleNamespace(turbine=turbine_sim, controller_int=controller_int)
-
             converged = sim_ws_mitrotor(
                 sim=sim, bem=bem, ws=v, dt=dt,
-                init_tsr=init_tsr,
-                init_pitch_rad=init_pitch_rad,   # rad
+                init_tsr=init_tsr_list[j],
+                init_pitch_rad=init_pitch_rad_list[j],   # rad
                 init_yaw_rad=yaw_rad,            # rad
                 wd=0.0,                      # rad
                 verbose=False,
@@ -311,13 +312,10 @@ def _run_one_yaw_row(
                 power_col[j] = sim.gen_power
 
         except Exception:
-            # leave NaN and continue to next yaw
-            if controller_int is not None:
-                try:
-                    controller_int.kill_discon()
-                except Exception:
-                    pass
             continue
+
+    # Kill controller
+    sim.controller_int.kill_discon()
 
     return i, pitch_col, tsr_col, power_col
 
@@ -441,9 +439,6 @@ def sim_ws_mitrotor(
 
     if not converged and verbose:
         print(f"WARNING: hit max_iter={max_iter} without convergence")
-
-    # Kill controller
-    sim.controller_int.kill_discon()
 
     # Save outputs
     sim.bld_pitch = bld_pitch               # rad

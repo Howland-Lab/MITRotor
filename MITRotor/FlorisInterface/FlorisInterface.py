@@ -100,6 +100,7 @@ class MITRotorTurbine(BaseOperationModel):
             self.pitch_interp = default_pitch_interp()   # 1D legacy default
         if self.tsr_interp is None:
             self.tsr_interp = default_tsr_interp()       # 1D legacy default
+        super().__attrs_post_init__()
 
     def _get_state_key(self, velocities: np.ndarray, yaw_angles: np.ndarray, tilt_angles: np.ndarray) -> tuple:
         # saves key to uniquely identify farm state -> avoids re-solving for calls to power, thrust, and induction for same state
