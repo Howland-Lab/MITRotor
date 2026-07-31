@@ -22,7 +22,8 @@ from rosco.toolbox.inputs.validation import load_rosco_yaml
 from MITRotor.Momentum import UnifiedMomentumLUT
 from MITRotor import BEM, BEMGeometry, IEA15MW
 from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, default_bem_factory, default_pitch_interp, default_tsr_interp
-from MITRotor.FlorisInterface.ROSCOInterface import get_rosco_control_interps, query_controls
+from MITRotor.FlorisInterface.ROSCOInterface import get_rosco_control_interps
+from MITRotor.FlorisInterface.InterfaceUtilities import query_controls
 
 
 # THIS RUN HAD:

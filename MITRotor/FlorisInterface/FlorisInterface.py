@@ -15,7 +15,7 @@ from MITRotor.Momentum import UnifiedMomentum
 from MITRotor.Geometry import BEMGeometry
 from MITRotor.TipLoss import NoTipLoss
 from MITRotor.BEMSolver import BEM
-from MITRotor.FlorisInterface.ROSCOInterface import query_controls
+from MITRotor.FlorisInterface.InterfaceUtilities import query_controls
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 
 InterpLike = Union[interp1d, RegularGridInterpolator, Callable]

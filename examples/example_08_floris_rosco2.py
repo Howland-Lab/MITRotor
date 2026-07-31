@@ -22,7 +22,8 @@ from rosco.toolbox.inputs.validation import load_rosco_yaml
 from MITRotor.Momentum import UnifiedMomentumLUT
 from MITRotor import BEM, BEMGeometry, IEA15MW
 from MITRotor.FlorisInterface.FlorisInterface import MITRotorTurbine, default_bem_factory, default_pitch_interp, default_tsr_interp
-from MITRotor.FlorisInterface.ROSCOInterface import get_rosco_control_interps, query_controls
+from MITRotor.FlorisInterface.ROSCOInterface import get_rosco_control_interps
+from MITRotor.FlorisInterface.InterfaceUtilities import query_controls
 
 figdir = Path("fig")
 
@@ -42,6 +43,7 @@ def change_control_param(param_key, param_value, template_yaml, bem, regenerate 
         pitch_interp, tsr_interp, rated_rotor_speed = get_rosco_control_interps(
             temp_yaml, bem,
             regenerate = regenerate, save_control_file = save_control_file,
+            n_jobs=1
         )
     return pitch_interp, tsr_interp, rated_rotor_speed
 
