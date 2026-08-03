@@ -87,15 +87,15 @@ def main():
     # takes ~25min with 8 workers
     rosco_VS_1_pitch_interp, rosco_VS_1_tsr_interp, rosco_VS_1_rated_rotorspeed = get_rosco_control_interps(
         rosco_yaml_VS_1, bem,
-        regenerate = False, save_control_file = "control_vs_1.csv")
-        # regenerate = True, save_control_file = "control_vs_1.csv")
+        # regenerate = False, save_control_file = "control_vs_1.csv")
+        regenerate = True, save_control_file = "control_vs_1.csv")
     end = time.time()
     print(f"Time to make control CSV: {end - start}")
     # takes ~25min with 8 workers
     rosco_VS_3_pitch_interp, rosco_VS_3_tsr_interp, rosco_VS_3_rated_rotorspeed = change_control_param(
         "VS_ControlMode", 3, rosco_yaml_VS_1, bem,
-        # regenerate = True, save_control_file = "control_vs_3.csv",
-        regenerate = False, save_control_file = "control_vs_3.csv"
+        regenerate = True, save_control_file = "control_vs_3.csv",
+        # regenerate = False, save_control_file = "control_vs_3.csv"
     )
         
     # Plot IEA15MW control from ROSCO paper, ROSOC control with VS_Control_Mode = 1, and ROSOC control withVS_Control_Mode = 3

@@ -55,15 +55,35 @@ class MITRotorTurbine(BaseOperationModel):
     Turbine operation model as described by Liew et al. (2024).
 
     Args:
-        bem_model (BEM): optional BEM model as defined in MITRotor, defaults to IEA15MW with UMM momentum model
-        pitch_interp (interp1d): optional 1D or 2D interpolator for pitch trajectory based on wind speed,
-            if 1D by wind speed then yaw not accounted for, if 2D then wind speed and yaw accounted for. 
-            Defaults to 1D IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf).
-            See ROSCOInterface.py for information on how to generate 2D control scheme interpolator.
-        tsr_interp (interp1d): optional  1D interpolator for tsr trajectory based on wind speed,
-            if 1D by wind speed then yaw not accounted for, if 2D then wind speed and yaw accounted for. 
-            Defaults to IEA15MW Figure 2 (https://docs.nrel.gov/docs/fy22osti/82134.pdf).
-            See ROSCOInterface.py for information on how to generate 2D control scheme interpolator.
+        bem_model (BEM, optional): BEM model as defined in MITRotor. Defaults to the
+            IEA15MW rotor with the UMM momentum model.
+
+        gen_eff (float, optional): Generator efficiency in percent [%].
+            Defaults to 95.756.
+
+        eff_ratio (float, optional): Optional efficiency ratio override (unitless).
+            If provided, this is used directly instead of deriving efficiency from
+            `gen_eff`. Defaults to None.
+
+        pitch_interp (InterpLike, optional): 1D or 2D interpolator for pitch trajectory.
+            - 1D: function of wind speed only (yaw not accounted for)
+            - 2D: function of wind speed and yaw
+            Defaults to the 1D IEA15MW Figure 2 trajectory
+            (https://docs.nrel.gov/docs/fy22osti/82134.pdf).
+            See `ROSCOInterface.py` for generating a 2D control-scheme interpolator.
+
+        pitch_rad (bool, optional): Whether the pitch interpolator uses radians (True)
+            or degrees (False). Defaults to True.
+
+        tsr_interp (InterpLike, optional): 1D or 2D interpolator for TSR trajectory.
+            - 1D: function of wind speed only (yaw not accounted for)
+            - 2D: function of wind speed and yaw
+            Defaults to the IEA15MW Figure 2 trajectory
+            (https://docs.nrel.gov/docs/fy22osti/82134.pdf).
+            See `ROSCOInterface.py` for generating a 2D control-scheme interpolator.
+
+        rated_rotor_speed (float, optional): Rated rotor speed [rad/s].
+            Defaults to None.
 
     Methods:
         power

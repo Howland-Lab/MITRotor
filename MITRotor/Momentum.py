@@ -126,12 +126,12 @@ class ConstantInduction(MomentumModel):
         self._func = self._func_rotor
 
     def compute_induction(self, Cx, yaw, tilt = 0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the ConstantInduction momentum model. Use UMM.")
         return self.a * np.ones_like(yaw)
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the ConstantInduction momentum model. Use UMM.")
         u4 = 1 - 2 * self.a
         v4 = - (1/4) * Ct * np.sin(yaw)
@@ -152,14 +152,14 @@ class ClassicalMomentum(MomentumModel):
         self.averaging = averaging
 
     def compute_induction(self, Cx, yaw, tilt = 0):
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the ClassicalMomentum momentum model. Use UMM.")
         Cx = np.asarray(Cx)
         sqrt_term = np.sqrt(np.where(Cx < 1, 1 - Cx, np.nan))
         return 0.5 * (1 - sqrt_term)
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the ClassicalMomentum momentum model. Use UMM.")
         u4 = np.sqrt(1 - Ct)
         v4 = - (1/4) * Ct * np.sin(yaw)
@@ -187,8 +187,8 @@ class MadsenMomentum(MomentumModel):
 
 
     def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        # if tilt != 0:
-            # raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
+        if np.any(tilt != 0):
+            raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         if self.cosine_exponent:
             Ct = Cx / (np.cos(yaw)**2)
         else:
@@ -198,7 +198,7 @@ class MadsenMomentum(MomentumModel):
         return an
 
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         u4 = np.sqrt(np.maximum(1 - Ct, 0))
         v4 = - (1/4) * Ct * np.sin(yaw)
@@ -230,7 +230,7 @@ class HeckMomentum(MomentumModel):
         self.averaging = averaging
 
     def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the HeckMomentum model for BEM. Use UMM.")
         Ctc = 4 * self.ac * (1 - self.ac) / (1 + 0.25 * (1 - self.ac) ** 2 * np.sin(yaw) ** 2)
         slope = (16 * (1 - self.ac) ** 2 * np.sin(yaw) ** 2 - 128 * self.ac + 64) / (
@@ -253,7 +253,7 @@ class HeckMomentum(MomentumModel):
         return a
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the HeckMomentum model for BEM. Use UMM.")
         a = self.compute_induction(Ct, yaw)
         u4 = 1 - Ct /(2  * (1 - a))

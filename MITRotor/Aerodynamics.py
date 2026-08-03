@@ -194,7 +194,7 @@ class KraghAerodynamics(AerodynamicModel):
             AerodynamicProperties: Calculated aerodynamic properties stored in AerodynamicProperties object.
 
         """
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the KraghAerodynamics model. Use DefaultAerodynamics.")
         local_yaw = wdir - yaw
 
