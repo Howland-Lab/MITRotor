@@ -22,7 +22,10 @@ from MITRotor.FlorisInterface.InterfaceUtilities import query_controls
 
 figdir = Path("fig")
 
-def change_control_param(param_key, param_value, template_yaml, bem, regenerate = False, save_control_file = "control.csv"):
+def change_control_param(
+    param_key, param_value, template_yaml, bem,
+    regenerate = False, save_control_file = "control.csv", yaw_grid_deg = np.linspace(-25.0,25.0,50),
+):
     yaml = YAML()
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_yaml = Path(tmpdir) / "rosco_temp.yaml"
@@ -37,7 +40,7 @@ def change_control_param(param_key, param_value, template_yaml, bem, regenerate 
 
         pitch_interp, tsr_interp, rated_rotor_speed = get_rosco_control_interps(
             temp_yaml, bem,
-            regenerate = regenerate, save_control_file = save_control_file,
+            regenerate = regenerate, save_control_file = save_control_file, yaw_grid_deg = yaw_grid_deg
         )
     return pitch_interp, tsr_interp, rated_rotor_speed
 
@@ -51,6 +54,7 @@ def main():
     # wind condtions
     wind_speeds = np.linspace(3, 25, 25)
     wind_dirs = np.full_like(wind_speeds, 270.0)
+    yaws_degs = np.linspace(-25.0,25.0,50)
     turbulence_intensity = np.zeros_like(wind_speeds)
     time_series = TimeSeries(
         wind_speeds=wind_speeds,
@@ -76,7 +80,7 @@ def main():
         cache_fn=cache_file,
         regenerate=False,
         LUT_Cts=np.linspace(-0.5,1.5,40),
-        LUT_yaws=np.linspace(0.0,40.0,40),
+        LUT_yaws=yaws_degs, # Note here that we are only allowing for yaws <25 degrees! Update if needed!
     )
     print("LUT for BEM done generating. ")
     bem = BEM(rotor = IEA15MW(), momentum_model = lut_model, geometry = BEMGeometry(Nr=10, Ntheta=20))
@@ -87,15 +91,17 @@ def main():
     # takes ~25min with 8 workers
     rosco_VS_1_pitch_interp, rosco_VS_1_tsr_interp, rosco_VS_1_rated_rotorspeed = get_rosco_control_interps(
         rosco_yaml_VS_1, bem,
-        # regenerate = False, save_control_file = "control_vs_1.csv")
-        regenerate = True, save_control_file = "control_vs_1.csv")
+        regenerate = False, save_control_file = "control_vs_1.csv",
+        yaw_grid_deg=yaws_degs
+    )
+    
     end = time.time()
     print(f"Time to make control CSV: {end - start}")
     # takes ~25min with 8 workers
     rosco_VS_3_pitch_interp, rosco_VS_3_tsr_interp, rosco_VS_3_rated_rotorspeed = change_control_param(
         "VS_ControlMode", 3, rosco_yaml_VS_1, bem,
         regenerate = True, save_control_file = "control_vs_3.csv",
-        # regenerate = False, save_control_file = "control_vs_3.csv"
+        yaw_grid_deg=yaws_degs
     )
         
     # Plot IEA15MW control from ROSCO paper, ROSOC control with VS_Control_Mode = 1, and ROSOC control withVS_Control_Mode = 3

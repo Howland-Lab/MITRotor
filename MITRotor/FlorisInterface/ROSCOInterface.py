@@ -131,12 +131,12 @@ def get_rosco_control_interps(
     save_control_file=None,
     save_dir=".",
     dt=0.05,
-    yaw_grid_deg=np.arange(0.0, 25.0, 1.0),  # degrees
+    yaw_grid_deg=np.arange(-25.0, 25.0, 1.0),  # degrees
     n_jobs=-1, # parallel workers across wind speeds
 ):
     """
     Creates pitch and tsr 2D interpolators using ROSCO controller tuning.
-    Parallelized over yaws; wind speeds for each yaw are solved sequentially in one worker with warm-start chaining.
+    Parallelized over yaws; wind speeds for each yaw are solved sequentially.
 
     Args:
         rosco_yaml (str): Path to ROSCO controller YAML configuration file.
@@ -175,10 +175,17 @@ def get_rosco_control_interps(
         )
     if (controller_params["VS_ControlMode"] == 2):
         warnings.warn(
-                    "We suggest NOT using VS_ControlMode = 2 within the control parameter file. Mismatched TSR definitions between MITRotor and" \
-                    "ROSCO lead to biased optimization.",
-                    UserWarning,
-                )
+            "We suggest NOT using VS_ControlMode = 2 within the control parameter file. Mismatched TSR definitions between MITRotor and" \
+            "ROSCO lead to biased optimization.",
+            UserWarning,
+        )
+
+    if (controller_params["Y_ControlMode"] != 0):
+        warnings.warn(
+            "We suggest ONLY using Y_ControlMode = 0 within the control parameter file. This turns off yaw control," \
+            "which is vital for keeping a steady yaw to determine yawed control setpoints.",
+            UserWarning,
+        )
 
     # Generate turbine Cp/Ct surfaces
     turbine = load_from_mitrotor(
@@ -268,33 +275,30 @@ def _run_one_yaw_row(
     nv = len(v_grid)
     pitch_col = np.full(nv, np.nan, dtype=float)
     tsr_col   = np.full(nv, np.nan, dtype=float)
-    power_col = np.full(nv, np.nan, dtype=float)\
-
-    j = 0
-    init_pitch_rad = init_pitch_rad_list[j]
-    init_pitch_deg = np.rad2deg(init_pitch_rad)
-    init_tsr = init_tsr_list[j]
-    init_rot_speed = init_tsr * v_grid[j] / turbine_sim.rotor_radius
-    init_gen_speed   = init_rot_speed * turbine_sim.Ng
-
-    controller_int = iu.WarmStartControllerInterface(
-        lib_name,
-        param_filename=param_filename,
-        sim_name=f"{SimName}_{i}_{j}",
-        DT=dt,
-        init_ws=v_grid[j],
-        init_rot_speed=init_rot_speed,
-        init_gen_speed=init_gen_speed,
-        init_pitch_deg=init_pitch_deg,   # deg
-        init_torque=0.0,
-        init_nac_imu=yaw_rad,            # rad
-    )
-
-    # lightweight sim object compatible with sim_ws_mitrotor
-    sim = SimpleNamespace(turbine=turbine_sim, controller_int=controller_int)
+    power_col = np.full(nv, np.nan, dtype=float)
 
     for j, v in enumerate(v_grid):
-        controller_int = None
+        init_pitch_rad = init_pitch_rad_list[j]
+        init_pitch_deg = np.rad2deg(init_pitch_rad)
+        init_tsr = init_tsr_list[j]
+        init_rot_speed = init_tsr * v / turbine_sim.rotor_radius
+        init_gen_speed   = init_rot_speed * turbine_sim.Ng
+
+        controller_int = iu.WarmStartControllerInterface(
+            lib_name,
+            param_filename=param_filename,
+            sim_name=f"{SimName}_{i}_{j}",
+            DT=dt,
+            init_ws=v,
+            init_rot_speed=init_rot_speed,
+            init_gen_speed=init_gen_speed,
+            init_pitch_deg=init_pitch_deg,   # deg
+            init_torque=0.0,
+            init_yaw_rad=yaw_rad,            # rad
+        )
+        # lightweight sim object compatible with sim_ws_mitrotor
+        sim = SimpleNamespace(turbine=turbine_sim, controller_int=controller_int)
+
         try:
             converged = sim_ws_mitrotor(
                 sim=sim, bem=bem, ws=v, dt=dt,
@@ -314,11 +318,12 @@ def _run_one_yaw_row(
         except Exception:
             continue
 
-    # Kill controller
-    sim.controller_int.kill_discon()
+
+        finally:
+            # Kill controller - runs no matter what (success, failure, exception)
+            sim.controller_int.kill_discon()
 
     return i, pitch_col, tsr_col, power_col
-
 
 # -----------------------------
 # Steady-state simulation

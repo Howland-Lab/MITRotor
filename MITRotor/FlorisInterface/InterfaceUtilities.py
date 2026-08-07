@@ -147,7 +147,7 @@ def run_yaw_row_sim(v_grid, yaw_grid_rad, yaw_row_func, n_jobs):
     
     def _run_serial(desc):
         out = []
-        for i, yaw_rad in enumerate(tqdm(yaw_grid_rad, total=n_wind, desc=desc, dynamic_ncols=True)):
+        for i, yaw_rad in enumerate(tqdm(yaw_grid_rad, total=n_yaw, desc=desc, dynamic_ncols=True)):
             out.append(yaw_row_func(i, yaw_rad))
         return out
 
@@ -202,7 +202,7 @@ class WarmStartControllerInterface(ROSCO_ci.ControllerInterface):
         init_gen_speed=1.0,       # rad/s
         init_pitch_deg=0.0,       # deg
         init_torque=0.0,          # Nm
-        init_nac_imu=0.0,         # rad
+        init_yaw_rad=0.0,         # rad
         **kwargs
     ):
         """
@@ -224,8 +224,8 @@ class WarmStartControllerInterface(ROSCO_ci.ControllerInterface):
             Initial collective blade pitch, in degrees.
         init_torque : float, optional
             Initial generator torque, in Nm.
-        init_nac_imu : float, optional
-            Initial nacelle IMU angle/state, in radians.
+        init_yaw_rad : float, optional
+            Initial yaw angle/state, in radians.
         **kwargs
             Additional keyword arguments forwarded to
             `ROSCO_ci.ControllerInterface` (e.g., `DT`, `sim_name`, etc.).
@@ -235,7 +235,7 @@ class WarmStartControllerInterface(ROSCO_ci.ControllerInterface):
         self.init_rot_speed = float(init_rot_speed)
         self.init_gen_speed = float(init_gen_speed)
         self.init_torque = float(init_torque)
-        self.init_nac_imu = float(init_nac_imu)
+        self.init_yaw_rad = float(init_yaw_rad)
 
         # Parent uses self.pitch for initial blade pitch
         super().__init__(
@@ -271,7 +271,7 @@ class WarmStartControllerInterface(ROSCO_ci.ControllerInterface):
         # --- warm-start initial states (replaces hard-coded values) ---
         self.avrSWAP[19] = self.init_gen_speed   # gen speed [rad/s]
         self.avrSWAP[20] = self.init_rot_speed   # rot speed [rad/s]
-        self.avrSWAP[82] = self.init_nac_imu     # nac IMU
+        self.avrSWAP[82] = 0  # HARD CODE initial nacIMU = 0
         self.avrSWAP[26] = self.init_ws          # wind speed [m/s]
         self.avrSWAP[22] = self.init_torque      # gen torque [Nm]
 
@@ -281,6 +281,10 @@ class WarmStartControllerInterface(ROSCO_ci.ControllerInterface):
         self.avrSWAP[3]  = pitch_rad
         self.avrSWAP[32] = pitch_rad
         self.avrSWAP[33] = pitch_rad
+
+        # Initial yaw
+        self.avrSWAP[23] = self.init_yaw_rad
+        self.avrSWAP[36] = self.init_yaw_rad
 
         self.avrSWAP[27] = 1  # IPC flag
 

@@ -89,6 +89,7 @@ class MITRotorTurbine(BaseOperationModel):
         power
         thrust_coefficient
         axial_induction
+        near_wake_velocities
     """
     # user can define a BEM model if they want a different rotor, momentum model, or geometry
     bem_model = field(init = True, factory = default_bem_factory, type = BEM)
