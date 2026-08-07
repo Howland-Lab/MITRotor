@@ -108,7 +108,6 @@ class MITRotorTurbine(BaseOperationModel):
     _u4 = field(init=False, default=None, type = NDArrayFloat)
     _v4 = field(init=False, default=None, type = NDArrayFloat)
     _w4 = field(init=False, default=None, type = NDArrayFloat)
-    _x0 = field(init=False, default=None, type = NDArrayFloat)
     _power = field(init=False, default=None, type = NDArrayFloat)
 
     # calculate a few needed fields post-initialization
@@ -148,7 +147,6 @@ class MITRotorTurbine(BaseOperationModel):
             self._u4 = np.empty((n_findex, n_turbines), dtype=floris_float_type)
             self._v4 = np.empty((n_findex, n_turbines), dtype=floris_float_type)
             self._w4 = np.empty((n_findex, n_turbines), dtype=floris_float_type)
-            self._x0 = np.empty((n_findex, n_turbines), dtype=floris_float_type)
             self._power = np.empty((n_findex, n_turbines), dtype=floris_float_type)
 
             # compute the power-effective wind speed across the rotor
@@ -184,8 +182,7 @@ class MITRotorTurbine(BaseOperationModel):
                 # get near wake velocities
                 self._u4[:, tindex] = bem_sol.u4
                 self._v4[:, tindex] = bem_sol.v4
-                self._w4[:, tindex] = bem_sol.w4 
-                self._x0[:, tindex] = bem_sol.x0 
+                self._w4[:, tindex] = bem_sol.w4
                 # compute power 
                 self._power[:, tindex] = (
                     0.5 * bem_sol.Cp() * air_density * rotor_area
@@ -208,4 +205,4 @@ class MITRotorTurbine(BaseOperationModel):
     
     def near_wake_velocities(self, **kwargs) -> NDArrayFloat:
         self._update_solution(**kwargs)
-        return (self._u4, self._v4, self._w4, self._x0)
+        return (self._u4, self._v4, self._w4)
