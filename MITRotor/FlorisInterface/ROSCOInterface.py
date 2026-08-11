@@ -65,7 +65,7 @@ def load_from_mitrotor(
     turbine.yaw = yaw
     turbine.tilt = tilt
 
-    # Calcualte remining needed values
+    # Calculate remining needed values
     turbine.rotor_radius = bem.rotor.R
     turbine.J = turbine.rotor_inertia + turbine.generator_inertia * turbine.Ng**2
     turbine.rated_torque = turbine.rated_power/(turbine.GenEff/100*turbine.rated_rotor_speed*turbine.Ng)

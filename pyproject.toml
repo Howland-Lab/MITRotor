@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "MITRotor"
-version = "0.2.1"
+version = "0.2.2"
 description = ""
 authors = ["Jaime Liew <jaimeliew1@gmail.com>"]
 readme = "README.md"
@@ -14,8 +14,15 @@ unified-momentum-model = {git = "https://github.com/Howland-Lab/Unified-Momentum
 pyyaml = "^6.0.1"
 floris = {git = "https://github.com/NatLabRockies/floris.git", branch = "dev/v5-beta"}
 rosco = "^2.10.4"
-ruamel-yaml = "^0.19.1"
-seaborn = "^0.13.2"
+joblib = "^1.5.3"
+tqdm-joblib = "^0.0.5"
+
+[tool.poetry.group.floris]
+optional = true
+
+[tool.poetry.group.floris.dependencies]
+floris = {git = "https://github.com/NatLabRockies/floris.git", branch = "dev/v5-beta"}
+rosco = "^2.10.4"
 joblib = "^1.5.3"
 tqdm-joblib = "^0.0.5"
 

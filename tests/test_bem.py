@@ -170,3 +170,32 @@ def test_BEM_dimensionality():
                 for name in fields:
                     val = np.asarray(getattr(sol, name)(grid=grid))
                     assert val.shape == expected_shape, f"{name}, {grid}"
+            # =========================
+            # 3. Vectorized vs Loop
+            # =========================
+            if Np > 0:  # Only test vectorized case
+                # Solve in loop (scalar inputs)
+                sols_loop = []
+                for i in range(Np):
+                    sol_loop = bem(pitch[i], tsr[i], yaw=yaw[i], tilt=tilt[i])
+                    sols_loop.append(sol_loop)
+                
+                # Compare u4, w4
+                u4_vec = np.asarray(sol.u4)
+                w4_vec = np.asarray(sol.w4)
+                
+                u4_loop = np.stack([np.asarray(s.u4) for s in sols_loop])
+                w4_loop = np.stack([np.asarray(s.w4) for s in sols_loop])
+                
+                np.testing.assert_allclose(u4_vec, u4_loop, atol=1e-5)
+                np.testing.assert_allclose(w4_vec, w4_loop, atol=1e-5)
+                
+                # Compare field outputs
+                for grid in ["rotor", "annulus", "sector"]:
+                    for name in fields:
+                        val_vec = np.asarray(getattr(sol, name)(grid=grid))
+                        val_loop = np.stack([
+                            np.asarray(getattr(s, name)(grid=grid)) 
+                            for s in sols_loop
+                        ])
+                        np.testing.assert_allclose(val_vec, val_loop, atol=1e-5)

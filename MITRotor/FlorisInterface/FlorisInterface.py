@@ -175,7 +175,7 @@ class MITRotorTurbine(BaseOperationModel):
 
             # solve BEM for setpoints from control curves
             for tindex in range(n_turbines):
-                # solve BEM
+                # solve BEM - NOTE: could add in additional keywords U and wdir
                 bem_sol = self.bem_model(pitch[:, tindex], tsr[:, tindex], yaw = yaw[:, tindex], tilt = tilt[:, tindex])
                 # get induction and thrust coeff
                 self._a[:, tindex] = bem_sol.a()
