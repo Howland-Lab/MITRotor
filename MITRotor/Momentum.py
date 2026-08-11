@@ -46,12 +46,6 @@ class MomentumModel(ABC):
     @abstractmethod
     def compute_initial_wake_velocities(self, Ct: float, yaw: float = 0, tilt: float = 0.0) -> ArrayLike:
         ...
-
-    def compute_initial_wake_velocities_and_x0(
-        self, Ct: float, yaw: float = 0, tilt: float = 0.0
-    ) -> ArrayLike:
-        return (*self.compute_initial_wake_velocities(Ct, yaw, tilt), None)
-
     
     def _func_rotor(
         self,
@@ -294,11 +288,6 @@ class UnifiedMomentum(MomentumModel):
     def compute_initial_wake_velocities(self, Cx: ArrayLike, yaw: float = 0.0, tilt: float = 0.0) -> ArrayLike:
         sol = self.model_Ct(Cx, yaw = yaw, tilt = tilt)
         return sol.u4, sol.v4, sol.w4
-
-    def compute_initial_wake_velocities_and_x0(self, Cx: ArrayLike, yaw: float = 0.0, tilt: float = 0.0) -> ArrayLike:
-        sol = self.model_Ct(Cx, yaw = yaw, tilt = tilt)
-        return sol.u4, sol.v4, sol.w4, sol.x0
-
 
 
 # Look-up table for unified model

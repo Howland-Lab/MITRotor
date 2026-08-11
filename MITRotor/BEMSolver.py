@@ -247,7 +247,7 @@ class BEM:
         aero_props = self.aerodynamic_model(an, aprime, pitch, tsr, yaw, self.rotor, self.geometry, U, wdir, tilt = tilt)
         aero_props.F = self.tiploss_model(aero_props, pitch, tsr, yaw, self.rotor, self.geometry, tilt = tilt)
         avg_Ct = average(self.geometry, aero_props.C_x)
-        u4,v4,w4,x0 = self.momentum_model.compute_initial_wake_velocities_and_x0(avg_Ct, yaw, tilt = tilt)
+        u4,v4,w4 = self.momentum_model.compute_initial_wake_velocities(avg_Ct, yaw, tilt = tilt)
 
         if self.scalar_inputs: # if all setpoints were scalars
             # return single values as scalars
