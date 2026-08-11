@@ -46,7 +46,6 @@ class BEMSolution:
     v4: float
     tilt: float = 0.0
     w4: float = 0
-    x0: float = 0
 
     def a(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         return average(self.geom, self.aero_props.an, grid)
@@ -262,4 +261,4 @@ class BEM:
                 if isinstance(value, np.ndarray):
                     setattr(aero_props, key, np.squeeze(value))
 
-        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4, tilt = tilt, w4 = w4, x0 = x0)
+        return BEMSolution(pitch, tsr, yaw, aero_props, self.geometry, result.converged, result.niter, u4, v4, tilt = tilt, w4 = w4)
