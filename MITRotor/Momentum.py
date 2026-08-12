@@ -8,6 +8,7 @@ from MITRotor.CachedLUT import CachedLUT
 from pathlib import Path
 from UnifiedMomentumModel import Momentum as UMM
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw, eff_yaw_inv_rotation
+from .Geometry import expand_to_Nr_Ntheta, expand_to_Nr, expand_to_Ntheta
 
 if TYPE_CHECKING:
     from .Geometry import BEMGeometry
@@ -45,7 +46,6 @@ class MomentumModel(ABC):
     @abstractmethod
     def compute_initial_wake_velocities(self, Ct: float, yaw: float = 0, tilt: float = 0.0) -> ArrayLike:
         ...
-
     
     def _func_rotor(
         self,
@@ -62,13 +62,11 @@ class MomentumModel(ABC):
             geom.rotor_average(
                 geom.annulus_average(
                     np.clip(aero_props.C_x_corr, 0, 1.69)
-                    )
-                    )
+                )
+            )
         )
-
-        return self.compute_induction(rotor_avg_axial_force, yaw = yaw, tilt = tilt)
-
-
+        an = self.compute_induction(rotor_avg_axial_force, yaw = yaw, tilt = tilt)
+        return expand_to_Nr_Ntheta(an)
 
     def _func_annulus(
         self,
@@ -81,15 +79,12 @@ class MomentumModel(ABC):
         tilt: float = 0.0,
     ) -> ArrayLike:
         
-        annulus_avg_axial_force = (
-            
-                geom.annulus_average(
-                    np.clip(aero_props.C_x_corr, -10, 10)
-                    )
-                    )[:, None] * np.ones(geom.shape)
-        
-
-        return self.compute_induction(annulus_avg_axial_force, yaw = yaw, tilt = tilt)
+        annulus_avg_axial_force = geom.annulus_average(
+            np.clip(aero_props.C_x_corr, 0, 1.69)
+        )
+        yaw, tilt = expand_to_Nr(yaw), expand_to_Nr(tilt)
+        an = self.compute_induction(annulus_avg_axial_force, yaw = yaw, tilt = tilt)
+        return expand_to_Ntheta(an)
 
     def _func_sector(
         self,
@@ -102,7 +97,7 @@ class MomentumModel(ABC):
         tilt: float = 0.0,
     ) -> ArrayLike:
         axial_force = np.clip(aero_props.C_x_corr, -10, 10)
-
+        yaw, tilt = expand_to_Nr_Ntheta(yaw), expand_to_Nr_Ntheta(tilt)
         return self.compute_induction(axial_force, yaw = yaw, tilt = tilt)
 
     def __call__(
@@ -125,12 +120,12 @@ class ConstantInduction(MomentumModel):
         self._func = self._func_rotor
 
     def compute_induction(self, Cx, yaw, tilt = 0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the ConstantInduction momentum model. Use UMM.")
         return self.a * np.ones_like(yaw)
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the ConstantInduction momentum model. Use UMM.")
         u4 = 1 - 2 * self.a
         v4 = - (1/4) * Ct * np.sin(yaw)
@@ -151,21 +146,19 @@ class ClassicalMomentum(MomentumModel):
         self.averaging = averaging
 
     def compute_induction(self, Cx, yaw, tilt = 0):
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the ClassicalMomentum momentum model. Use UMM.")
         Cx = np.asarray(Cx)
         sqrt_term = np.sqrt(np.where(Cx < 1, 1 - Cx, np.nan))
         return 0.5 * (1 - sqrt_term)
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the ClassicalMomentum momentum model. Use UMM.")
         u4 = np.sqrt(1 - Ct)
         v4 = - (1/4) * Ct * np.sin(yaw)
         w4 = 0.0
         return u4, v4, w4
-
-
 
 class MadsenMomentum(MomentumModel):
     """
@@ -188,7 +181,7 @@ class MadsenMomentum(MomentumModel):
 
 
     def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         if self.cosine_exponent:
             Ct = Cx / (np.cos(yaw)**2)
@@ -199,7 +192,7 @@ class MadsenMomentum(MomentumModel):
         return an
 
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the Madsen momentum model. Use UMM.")
         u4 = np.sqrt(np.maximum(1 - Ct, 0))
         v4 = - (1/4) * Ct * np.sin(yaw)
@@ -231,7 +224,7 @@ class HeckMomentum(MomentumModel):
         self.averaging = averaging
 
     def compute_induction(self, Cx: ArrayLike, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the HeckMomentum model for BEM. Use UMM.")
         Ctc = 4 * self.ac * (1 - self.ac) / (1 + 0.25 * (1 - self.ac) ** 2 * np.sin(yaw) ** 2)
         slope = (16 * (1 - self.ac) ** 2 * np.sin(yaw) ** 2 - 128 * self.ac + 64) / (
@@ -254,7 +247,7 @@ class HeckMomentum(MomentumModel):
         return a
     
     def compute_initial_wake_velocities(self, Ct: float, yaw: float, tilt: float = 0.0) -> ArrayLike:
-        if tilt != 0:
+        if np.any(tilt != 0):
             raise ValueError("Tilt not supported by the HeckMomentum model for BEM. Use UMM.")
         a = self.compute_induction(Ct, yaw)
         u4 = 1 - Ct /(2  * (1 - a))
@@ -334,7 +327,7 @@ class ThrustBasedUnifiedLUT(CachedLUT, UMM.MomentumBase):
             as described in UMM documentation, yaw and tilt can be combined into an "effective yaw"
             the cache uses effective yaw, so these values should cover the range of effective yaws you
             want. You can use UnifiedMomentumModel.Utilities.Geometry.calc_eff_yaw to find
-        - beta (float, optional) - used in UMM
+        - beta_s (float, optional) - used in UMM
         - cached (boolean, optional) - cache nonlinear pressure in UMM
     """
     def __init__(self, cache_fn: Path = CACHE_FN_CT, regenerate=False, s=0.025,

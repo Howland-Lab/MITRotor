@@ -15,6 +15,12 @@ fig*
 *.tar
 *.whl
 
+# Allow these CSVs needed for the floris interface
+!MITRotor/FlorisInterface/IEA_15mw_rotor.csv
+!examples/examples_in/*
+
+Validation/
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -189,3 +195,9 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+.DS_Store
+examples/Tune_Cases/
+*dbg*
+DISCON.IN
+*txt

@@ -17,7 +17,7 @@ def plot_radial_distributions(sol: BEMSolution, save_to: Path):
 
     [ax.legend(loc="lower center") for ax in axes]
 
-    axes[-1].set_xlabel("Radial position, $\mu$ [-]")
+    axes[-1].set_xlabel("Radial position, $\\mu$ [-]")
     plt.xlim(0, 1)
     plt.savefig(save_to, dpi=300, bbox_inches="tight")
 

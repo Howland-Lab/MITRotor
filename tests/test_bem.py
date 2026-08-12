@@ -1,11 +1,10 @@
-from MITRotor import BEM, IEA15MW, UnifiedMomentum, BEMGeometry
+from MITRotor import BEM, IEA15MW, UnifiedMomentum, UnifiedMomentumLUT, BEMGeometry
 from UnifiedMomentumModel.Utilities.Geometry import calc_eff_yaw
 import numpy as np
 from pytest import approx
 
 def test_IEA15MW():
     IEA15MW()
-
 
 def test_BEM_initialise():
     rotor = IEA15MW()
@@ -103,3 +102,100 @@ def test_model_yaw_tilt_rotor_phase():
         assert np.isclose(np.abs(theta_mesh[yaw_max_idx] - theta_mesh[tilt_max_idx]), np.pi / 2, atol = deg_atol)
         # yaw and evenly split yaw/tilt should be offset by 45 degrees
         assert np.isclose(np.abs(theta_mesh[yaw_max_idx] - theta_mesh[yaw_and_tilt_max_idx]), np.pi / 4, atol = deg_atol)
+
+def _expected_shape(grid, Np, Nr, Ntheta):
+    if grid == "rotor":
+        return () if Np == 0 else (Np,)
+    elif grid == "annulus":
+        return (Nr,) if Np == 0 else (Np, Nr)
+    elif grid == "sector":
+        return (Nr, Ntheta) if Np == 0 else (Np, Nr, Ntheta)
+    else:
+        raise ValueError(grid)
+
+
+def test_BEM_dimensionality():
+    Nr, Ntheta = 20, 40
+    rotor = IEA15MW()
+
+    bems = [
+        BEM(rotor=rotor,
+            momentum_model=UnifiedMomentum(averaging="rotor"),
+            geometry=BEMGeometry(Nr=Nr, Ntheta=Ntheta)),
+
+        BEM(rotor=rotor,
+            momentum_model=UnifiedMomentumLUT(averaging="annulus"),
+            geometry=BEMGeometry(Nr=Nr, Ntheta=Ntheta)),
+
+        BEM(rotor=rotor,
+            momentum_model=UnifiedMomentumLUT(averaging="sector"),
+            geometry=BEMGeometry(Nr=Nr, Ntheta=Ntheta)),
+    ]
+
+    # --- inputs ---
+    pitch_s, tsr_s, yaw_s, tilt_s = 0.0, 7.0, 0.0, 0.0
+
+    pitch_v = np.array([0.0, 0.1, 0.2])
+    tsr_v   = np.array([6.0, 7.0, 8.0])
+    yaw_v   = np.array([0.0, 0.1, 0.2])
+    tilt_v  = np.array([0.0, -0.1, -0.2])
+
+    cases = [
+        (pitch_s, tsr_s, yaw_s, tilt_s, 0),
+        (pitch_v, tsr_v, yaw_v, tilt_v, 3),
+    ]
+
+    fields = ["Cp", "Cp_corr", "Ct", "a", "aoa"]
+
+    for pitch, tsr, yaw, tilt, Np in cases:
+        for bem in bems:
+            sol = bem(pitch, tsr, yaw=yaw, tilt=tilt)
+
+            # =========================
+            # 1. u4, w4 dimensionality
+            # =========================
+            u4 = np.asarray(sol.u4)
+            w4 = np.asarray(sol.w4)
+
+            expected = () if Np == 0 else (Np,)
+            assert u4.shape == expected
+            assert w4.shape == expected
+
+            # =========================
+            # 2. Shape checks for fields
+            # =========================
+            for grid in ["rotor", "annulus", "sector"]:
+                expected_shape = _expected_shape(grid, Np, Nr, Ntheta)
+
+                for name in fields:
+                    val = np.asarray(getattr(sol, name)(grid=grid))
+                    assert val.shape == expected_shape, f"{name}, {grid}"
+            # =========================
+            # 3. Vectorized vs Loop
+            # =========================
+            if Np > 0:  # Only test vectorized case
+                # Solve in loop (scalar inputs)
+                sols_loop = []
+                for i in range(Np):
+                    sol_loop = bem(pitch[i], tsr[i], yaw=yaw[i], tilt=tilt[i])
+                    sols_loop.append(sol_loop)
+                
+                # Compare u4, w4
+                u4_vec = np.asarray(sol.u4)
+                w4_vec = np.asarray(sol.w4)
+                
+                u4_loop = np.stack([np.asarray(s.u4) for s in sols_loop])
+                w4_loop = np.stack([np.asarray(s.w4) for s in sols_loop])
+                
+                np.testing.assert_allclose(u4_vec, u4_loop, atol=1e-5)
+                np.testing.assert_allclose(w4_vec, w4_loop, atol=1e-5)
+                
+                # Compare field outputs
+                for grid in ["rotor", "annulus", "sector"]:
+                    for name in fields:
+                        val_vec = np.asarray(getattr(sol, name)(grid=grid))
+                        val_loop = np.stack([
+                            np.asarray(getattr(s, name)(grid=grid)) 
+                            for s in sols_loop
+                        ])
+                        np.testing.assert_allclose(val_vec, val_loop, atol=1e-5)
