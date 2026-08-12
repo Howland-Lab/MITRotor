@@ -12,10 +12,6 @@ numpy = "^2.2.1"
 scipy = ">=1.6"
 unified-momentum-model = {git = "https://github.com/Howland-Lab/Unified-Momentum-Model.git"}
 pyyaml = "^6.0.1"
-floris = {git = "https://github.com/NatLabRockies/floris.git", branch = "dev/v5-beta"}
-rosco = "^2.10.4"
-joblib = "^1.5.3"
-tqdm-joblib = "^0.0.5"
 
 [tool.poetry.group.floris]
 optional = true
