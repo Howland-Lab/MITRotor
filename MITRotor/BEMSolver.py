@@ -125,6 +125,8 @@ class BEMSolution:
 
     def Ctprime(self, grid: Literal["sector", "annulus", "rotor"] = "rotor"):
         eff_yaw = calc_eff_yaw(self.yaw, self.tilt)
+        if eff_yaw.ndim == 1:
+            eff_yaw = expand_to_Nr_Ntheta(eff_yaw)
         Ctprime = self.Ct(grid="sector") / ((1 - self.a(grid="sector")) ** 2 * np.cos(eff_yaw) ** 2)
         return average(self.geom, Ctprime, grid=grid)
     
